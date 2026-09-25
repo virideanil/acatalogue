@@ -44,8 +44,10 @@ serious:
 | Statistical standards (UN M49, ISO 3166, ISO 639) | places, languages | public standards |
 | Domain ontologies (medicine, biology, agriculture, heritage…) | deep, expert vocabularies | varies |
 
-This repository ingests four of these today — UN M49, Wikidata, English Wikipedia and the top
-classes of UDC/DDC/LCC/Propædia — and is designed so the rest plug into the same pipeline.
+This repository ingests five of these today — UN M49, Wikidata (entity summaries and, since the
+second round, every statement of the reconciled items with its qualifiers and references), English
+Wikipedia, the top classes of UDC/DDC/LCC/Propædia, and World Bank population and land area as the
+audit's declared baselines — and is designed so the rest plug into the same pipeline.
 
 ## 2. The layers
 
@@ -58,8 +60,10 @@ convention.
 | **Named corpora** | dated collections of sources, e.g. `wikipedia-en-intros-20260925` | sealed after fetching; a sealed corpus refuses writes | `corpora/*/corpus.sqlite` |
 | **Text** | documents and passages extracted from corpora | offsets point back into the document text; each document names its source hash | `document`, `passage` |
 | **Compendium** | concept schemes: labels in every language, broader (several parents allowed), related, crosswalks, facets | identities are deprecated, never deleted | `scheme`, `concept`, `label`, `broader`, `related`, `mapping`, `facet` |
-| **Claims** | statements: subject – predicate – object/value | every claim names its source bytes and carries an epistemic status and two times (when true in the world; when recorded) | `claim` |
-| **Semantic** | vectors, neighbours and a 2-D layout, labelled by the method that made them | a new method is added beside, never silently swapped | `model`, `embedding`, `neighbor`, `layout` |
+| **Claims** | statements: subject – predicate – object/value, one row per source statement (its id, rank, snak type — value, "unknown value" or "no value" — and a JSON Pointer into the source bytes); qualifiers and references as ordered rows | every claim names its source bytes and carries an epistemic status and two times (when true in the world, with integer day bounds that sort correctly across BCE; when recorded, from the bytes' retrieval time); a newer reading supersedes, never deletes | `claim`, `claim_qualifier`, `claim_reference`, `v_claim_*` |
+| **Review** | people's decisions on machine proposals: approve, revise, object — with reviewer, declared perspective, date and rationale | proposals and decisions are separate records; an agent's review is never decisive | `seed/reviews/`, `review` |
+| **Semantic** | vectors, neighbours and a 2-D layout, labelled by the method that made them; the particle layout baked by the browser's own physics | a new method is added beside, never silently swapped | `model`, `embedding`, `neighbor`, `layout` |
+| **Measurement** | bias audits against declared baselines; retrieval evaluations | every run is stored with the ledger head it describes | `baseline`, `audit_*`, `eval_*` |
 | **Ledger** | every action on the database | append-only (triggers) and hash-chained (SHA-512 over the previous row) | `ledger` |
 | **Views** | grepper, API, particle field, audit | read-only | `grep.py`, `server.py`, `viz/` |
 
@@ -154,36 +158,65 @@ design goal is therefore **bias-transparency with plurality**:
 2. **Plurality instead of a verdict.** A contested matter keeps every account, each attributed
    (`epistemic/contested`); a belief held within a tradition is recorded as that tradition's
    account (`epistemic/tradition`), not judged.
-3. **Measured coverage.** `acat audit` counts skew instead of asserting balance. From this build:
-   - concepts tagged per UN M49 region: Asia 28, Africa 13, Europe 10, Americas 9, Oceania 9, Antarctica 1;
-   - the median number of Wikipedia language editions per domain ranges from 42 (Human Past) to
-     118.5 (Life); regional-history items are thinly linked across languages;
+3. **Measured coverage, against declared baselines.** `acat audit` measures skew instead of
+   asserting balance, and every build stores the run (`audit_run`, `audit_metric`). A count alone
+   says nothing — "13 African concepts" is only skewed relative to something — so each region's share
+   of the place-tagged concepts is compared with three declared baselines: its share of the world's
+   population (World Bank 2024), of land area (2023), and an equal share. Ratios come with 95% Wilson
+   intervals; the divergence of the whole distribution (Jensen–Shannon, in bits) comes with a
+   bootstrap interval and is compared with what random sampling from the baseline itself produces.
+   From this build (65 place-tagged concepts; 534 carry no place, itself a finding):
+   - against population, Asia is below parity (0.67×, interval 0.48–0.87×) and Oceania far above
+     (23×, 12–41×); Africa, the Americas and Europe cannot be told apart from parity at this size;
+   - against equal shares Asia is above parity (2.4×) — the same catalogue reads as over- or
+     under-weighting Asia depending on the baseline, which is why no single "bias score" is given;
+   - the divergence exceeds random sampling against all three baselines at region level;
+   - sibling parity flags subtrees three or more times their siblings' median (for example
+     *Religious and spiritual traditions*, 26 concepts, among siblings with a median of 1);
+   - only 8,222 of 48,210 current Wikidata statements about these concepts cite a source beyond
+     "imported from a Wikimedia project"; for the hierarchy statements the check below compares
+     against, 247 of 2,441;
    - Wikidata also states 161 of 481 ACAT parent links between matched items; the other 320 are
      not stated there (which is not the same as a disagreement).
-4. **Visible, reversible process.** Every reconciliation decision records its method and reviewer;
-   every build and import is a ledger row with a receipt and an undo instruction.
+4. **Visible, reversible process.** Every reconciliation decision records its method and who made
+   it; a machine's proposal and a person's decision are separate records (`acat review`), and the
+   audit counts them: today 572 accepted crosswalks were decided by an AI agent and none has yet been
+   reviewed by a person. Every build and import is a ledger row with a receipt and an undo instruction.
 
 ### Known biases of this version (so that nobody has to discover them)
 
-- The compendium was authored and the Wikidata reconciliation reviewed by one AI agent in one
-  session (the `reviewer` column says so). It needs human review, ideally by several people from
-  different traditions and regions.
+- The compendium was authored and the Wikidata reconciliation decided by one AI agent in one
+  session (the `reviewer` column says so; the audit counts it). It needs human review, ideally by
+  several people from different traditions and regions; `acat review queue` lists what awaits them,
+  `exactMatch` first because it is transitive.
 - Identifiers and scope notes are English. Labels exist in 489 languages, but the authored text
   and the ids privilege English.
 - The first text corpus is English Wikipedia, whose coverage is itself skewed by region, gender
   and language.
 - `space` is the UN statistical view of places. Disputed territories appear as the UN lists
   them; other views (ISO 3166, national, historical) should be added as further schemes.
-- "Wikipedia language editions" measures encyclopedic attention, not importance; two concepts
-  matched thin Wikidata items (probability and statistics; geometry and topology) and show
-  artificially low coverage — a curation task the audit surfaced.
+- "Wikipedia language editions" measures encyclopedic attention, not importance. It leaves out the
+  Cebuano and Waray editions, which a bot (Lsjbot) generated en masse; 310 concepts' counts change.
+  Two concepts matched thin Wikidata items (probability and statistics; geometry and topology) and
+  show artificially low coverage — a curation task the audit surfaced.
+- Only 65 of 599 concepts carry a place; the regional audit describes those 65, and its intervals
+  are wide. The population and area baselines lack 33 of 248 UN M49 areas (the World Bank does not
+  report them), and the World Bank's aggregates are excluded by its own classification.
 - The semantic layer is fit on English text, so its neighbourhoods are English-shaped.
 
 ## 5. Keeping it updated and finely curated
 
 - **Sources are immutable and dated.** `acat fetch <source>` writes a new sealed corpus named
-  `<family>-<yyyymmdd>`; old corpora stay. Fetching is polite (paced, `Retry-After` honoured) and
-  every attempt, including refusals, is logged in the corpus.
+  `<family>-<yyyymmdd>`; old corpora stay, and a corpus that is not sealed never feeds a build.
+  Fetching is polite: a policy-format User-Agent, `maxlag=5` for Wikimedia APIs, gzip (the decoded
+  bytes are what is hashed), `Retry-After` honoured, and busy signals waited out with backoff. Every
+  response passes a check before it is stored: MediaWiki and the World Bank report errors inside HTTP
+  200 bodies, and such a body is logged as refused, never sealed as data (the 2026-09-25 statements
+  fetch refused eleven `maxlag` bodies). Every attempt is logged in the corpus.
+- **Statements, not summaries.** Wikidata claims are read from entity JSON, one per statement, with
+  its id, rank, snak type, the entity revision and a JSON Pointer to it in the stored bytes;
+  qualifiers and references are rows. The earlier query-service summaries of the same entities are
+  superseded (kept, marked), per entity and only by a newer reading.
 - **Curated decisions are reviewable text.** The compendium (`seed/compendium/`), the external
   crosswalk and the Wikidata decisions (`seed/crosswalk/acat-wikidata.tsv`) are TSV files: one
   decision per line, diffable, mergeable, reviewable in a pull request. The database is a pure
@@ -194,9 +227,12 @@ design goal is therefore **bias-transparency with plurality**:
 - **Two times per claim.** `valid_from`/`valid_to` say when a statement is true of the world;
   `recorded_at`/`superseded_at` say when the catalogue believed it. Both "what was true in 1900?"
   and "what did we believe last year?" stay answerable.
-- **The curation loop.** propose (automatic, strict rules) → review (human or model; the
-  reviewer is recorded) → accept or reject into the seed files → build → audit → the audit's
-  thinnest areas become the next backlog.
+- **The curation loop.** propose (automatic, strict rules; the proposer is recorded) → a person
+  reviews (`acat review approve|revise|object`, with a declared perspective and a rationale; the
+  decision goes to `seed/reviews/<name>.tsv`) → build (the latest human decision applies on top of
+  the proposal; an objection takes a mapping out of use, a revision can change its relation) →
+  audit → the audit's thinnest areas and sibling-parity flags become the next backlog. Views
+  (`v_claim_current`, `v_claim_truthy`, `v_claim_evidence`) filter instead of deleting.
 - **Integrity on demand.** `acat verify` validates the seeds, re-hashes every stored byte in every
   corpus against its manifest, and recomputes the ledger chain.
 
@@ -228,7 +264,19 @@ for databases that are not catalogues at all.
 compiled to `viz/dist/`). Each concept is a particle; hierarchy, relations, crosswalks and semantic
 neighbours are springs; everything repels everything else (Barnes–Hut); the thirteen domains carry a
 radial spring toward a ring, so the circle of learning emerges from the physics instead of being
-drawn. Motion is integrated, never tweened. Domains are identified by position and direct labels,
+drawn. Motion is integrated, never tweened.
+
+The layout is **baked**: `acat bake` runs the same compiled physics in Node from the same
+deterministic placement until the field rests (2,656 steps — exactly the steps Chromium needs live),
+and stores the positions as a layout model named by the physics' SHA-512. The page adopts them and
+opens at rest in about 0.2 s instead of 23 s of settling, and every viewer sees the same layout
+whatever their engine's floating point; the physics then only answers disturbances (drags). A
+**Pause motion** control (key `p`, WCAG 2.2.2) stops everything that moves on its own. A **tree
+view** (ARIA tree pattern, keyboard operable, lazily expanded) gives the hierarchy a non-visual
+route and follows the selection. Links between clusters are drawn for the particle under the
+pointer or selected, or all at once on request, so the structure is not hidden under its
+cross-links. The audit panel draws the representation ratios against the chosen baseline as
+dots with intervals and a parity line, with a table view beside them. Domains are identified by position and direct labels,
 not by thirteen hues (a scatter of this kind cannot keep more than three colours distinguishable);
 colour is reserved for emphasis (search hits, selection) and for one sequential lens: how many
 Wikipedia language editions cover each concept — the bias view, made visible.
@@ -237,7 +285,8 @@ Wikipedia language editions cover each concept — the bias view, made visible.
 
 | Stage | Scale | What changes |
 |---|---|---|
-| v0.1 (this) | ~1,000 concepts, 2,705 Wikidata items, 1,935 passages, 121,717 labels, 4,045 claims; 67 MB; 8 s build | — |
+| v0.1 | ~1,000 concepts, 2,705 Wikidata items, 1,935 passages, 121,717 labels, 4,045 claims; 67 MB; 8 s build | — |
+| v0.2 (this) | the same compendium; 10,131 Wikidata items named, 48,210 statements with 19,771 qualifiers and 10,168 references; audits and evaluations stored; 9 s build | statement-level claims, declared baselines, a review ledger, a baked layout, a measured search |
 | Depth | 10⁴–10⁵ concepts | expand the compendium from Wikidata subclass trees and domain vocabularies, reviewed in batches; add OpenAlex topics (free API key) as a crosswalked scheme |
 | Breadth | 10⁶–10⁷ entities | entities (people, places, works, events) with the `kind` facet; claims from Wikidata dumps; SQLite shards per corpus family, attached at query time |
 | All of Wikidata | ~10⁸ items, ~10⁹ statements | keep bytes in object storage or a dataset host rather than git, with the same manifests; query the full graph with a dedicated engine (e.g. QLever) or columnar files (DuckDB/Parquet); keep this SQLite catalogue as the curated core |

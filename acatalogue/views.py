@@ -117,7 +117,10 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
 
 def graph(conn: sqlite3.Connection, schemes: tuple[str, ...] = GRAPH_SCHEMES, *, with_layout: bool = True) -> dict:
     marks = ",".join("?" * len(schemes))
-    model = _one(conn, "SELECT id FROM model WHERE id NOT LIKE 'layout/%' ORDER BY created_at DESC LIMIT 1")
+    # the semantic model drawn as neighbour springs: the newest one that has neighbours (not a baked
+    # layout, not a vector set without neighbours such as the dense label vectors)
+    model = _one(conn, "SELECT m.id FROM model m WHERE EXISTS (SELECT 1 FROM neighbor n WHERE n.model = m.id)"
+                       " ORDER BY m.created_at DESC LIMIT 1")
     model_id = model[0] if model else None
     rows = conn.execute(
         f"SELECT c.id, c.label, c.scheme, s.root, s.depth, s.descendants, s.docs, s.sitelinks, l.x, l.y"

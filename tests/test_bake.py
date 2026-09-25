@@ -38,9 +38,17 @@ class BakeTests(unittest.TestCase):
         self.assertFalse(g["layout"]["stale"])
         self.assertTrue(all(n["pos"] is not None for n in g["nodes"]))
 
-    def test_semantic_model_is_not_confused_with_a_layout(self):
+    def test_semantic_model_is_not_confused_with_a_layout_or_a_vector_set(self):
         from acatalogue.views import graph
-        self.assertFalse((graph(self.conn)["semantic_model"] or "").startswith("layout/"))
+        before = graph(self.conn)
+        self.assertFalse((before["semantic_model"] or "").startswith("layout/"))
+        # a newer model without neighbours (e.g. dense label vectors) must not take its place
+        self.conn.execute("INSERT INTO model(id, method, created_at) VALUES ('dense/x', 'test vectors', '2999-01-01T00:00:00Z')")
+        after = graph(self.conn)
+        self.assertEqual(after["semantic_model"], before["semantic_model"])
+        self.assertEqual(len(after["edges"]), len(before["edges"]))
+        self.assertFalse(after["layout"]["stale"])
+        self.conn.rollback()
 
     def test_a_changed_graph_marks_the_layout_stale(self):
         from acatalogue.views import graph

@@ -8,18 +8,22 @@ A curated, attributed catalogue of knowledge:
   599 concepts with scope notes, labels in 489 languages, crosswalks to UDC, DDC, LCC, the Propædia and Wikidata;
 - **a SQL grepper** — word, substring and regex search over concepts, passages and labels in every language,
   showing the SQL it ran; it can also grep any SQLite file;
-- **a particle field** — the whole catalogue as a physical system you can search and explore in the browser.
+- **a particle field** — the whole catalogue as a physical system you can search and explore in the browser;
+- **a bias audit and a review ledger** — coverage measured against declared baselines with intervals, and
+  every machine proposal kept apart from the people who approve, revise or object to it.
 
 Why it is built this way — and what "without bias" can honestly mean — is in [docs/DESIGN.md](docs/DESIGN.md).
-The founding request and what became of each part of it is in [docs/BRIEF.md](docs/BRIEF.md).
+The requests and what became of each part of them are in [docs/BRIEF.md](docs/BRIEF.md); the research
+behind the second round is in [reports/](reports/Improving%20the%20acatalogue%20knowledge%20base.md).
 
 ## Quick start
 
 Python 3.11+ with its standard library is all you need (numpy only for the semantic layer).
 
 ```sh
-./bin/acat build                 # seed/ + corpora/  ->  data/acatalogue.sqlite   (~8 s, no network)
+./bin/acat build                 # seed/ + corpora/  ->  data/acatalogue.sqlite   (~9 s, no network)
 ./bin/acat semantic              # optional: LSA neighbours and layout (needs numpy)
+./bin/acat bake                  # optional: bake the particle layout with the browser's own physics (needs Node)
 ./bin/acat serve                 # http://127.0.0.1:8765/  — the particle field + JSON API
 ```
 
@@ -43,12 +47,18 @@ acat sql "SELECT id, label FROM concept WHERE scheme = 'space' LIMIT 5"
 ```sh
 acat show acat/tengrism        # everything about one id: labels, parents, mappings, documents, claims, neighbours, provenance
 acat tree acat/belief -d 2     # the compendium as a tree
-acat audit                     # coverage and bias measurements
+acat audit                     # coverage and bias against declared baselines (stored per build)
+acat review queue              # machine-proposed crosswalks awaiting a person, exactMatch first
+acat review approve acat/physics wd/Q413 --reviewer "Your Name" [--perspective …]
+acat review revise  acat/x wd/Q1 --relation closeMatch --reviewer "…" --rationale "…"
+acat review object  acat/x wd/Q1 --reviewer "…" --rationale "…"    # decisions go to seed/reviews/<name>.tsv
+acat eval                      # leave-one-language-out retrieval evaluation (stored in eval_* tables)
+acat embed                     # optional: dense multilingual label vectors (onnxruntime + the pinned model)
 acat verify                    # validate seeds, re-hash every corpus, check the ledger chain
 acat stats                     # counts, corpora, ledger head
 acat compendium-md             # regenerate docs/COMPENDIUM.md
 acat export-graph              # write viz/data/graph.json for the particle field without a server
-acat fetch m49|external|wikidata|wikipedia   # fetch a source into a new dated, sealed corpus (network)
+acat fetch m49|external|wikidata|wikidata-statements|wikipedia|worldbank   # new dated, sealed corpus (network)
 ```
 
 ## Layout
@@ -58,12 +68,14 @@ acat fetch m49|external|wikidata|wikipedia   # fetch a source into a new dated, 
 | `seed/schemes.tsv` | the concept schemes and their licences |
 | `seed/compendium/acat/*.tsv` | the ACAT compendium, one concept per line (edit these) |
 | `seed/schemes/*.tsv` | facet vocabularies (kind, epistemic) and external scheme top classes |
-| `seed/crosswalk/*.tsv` | reviewed crosswalks: ACAT ↔ UDC/DDC/LCC/Propædia, ACAT ↔ Wikidata |
+| `seed/crosswalk/*.tsv` | crosswalks: ACAT ↔ UDC/DDC/LCC/Propædia, ACAT ↔ Wikidata (proposals, with who proposed them) |
+| `seed/reviews/<name>.tsv` | people's decisions on those proposals (`acat review`); applied on top at build |
 | `corpora/<name>-<yyyymmdd>/corpus.sqlite` | sealed named corpora: exact bytes (SQLite Archive table), fetch log, manifest |
 | `acatalogue/` | the Python package (standard library only) |
 | `acatalogue/schema.sql` | the catalogue schema and its enforced invariants |
 | `viz/` | the particle field (TypeScript source in `viz/src`, compiled JS in `viz/dist`) |
 | `docs/` | design, API contract, compendium, brief |
+| `reports/`, `research_notes/` | the research report and the notes and prototypes behind it |
 | `tests/` | `python3 -m unittest discover -s tests` |
 | `data/` | the built database (not in git; `acat build` recreates it) |
 
@@ -73,4 +85,6 @@ Code and authored seeds: see the repository licence (to be chosen by the owner).
 its own licence, recorded per source in the database: Wikidata (CC0), Wikipedia text (CC BY-SA 4.0 —
 anything redistributed from `corpora/wikipedia-en-intros-*` must carry attribution and the same
 licence; every document stores its page URL and revision), UN M49 (UNSD public standard), UDC Summary
-(CC BY-SA 3.0), LCC (U.S. Government work), DDC (© OCLC; only class numbers and captions are cited).
+(CC BY-SA 3.0), LCC (U.S. Government work), DDC (© OCLC; only class numbers and captions are cited),
+World Bank WDI (CC BY 4.0). The optional dense model, multilingual-e5-large-instruct (MIT), is not stored
+in the repository: `acat embed` verifies the pinned files' SHA-256 before using them.

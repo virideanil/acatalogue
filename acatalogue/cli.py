@@ -300,11 +300,17 @@ def cmd_serve(args) -> int:
 
 
 def cmd_export_graph(args) -> int:
-    from .views import graph
-    g = graph(_ro(args))
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(json.dumps(g, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    from .views import audit, graph
+    conn = _ro(args)
+    g = graph(conn)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(g, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"wrote {args.out}: {len(g['nodes'])} nodes, {len(g['edges'])} edges")
+    # the stored audit beside it, so a static page can show it without the API
+    a = out.with_name("audit.json")
+    a.write_text(json.dumps(audit(conn), ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"wrote {a}")
     return 0
 
 
@@ -386,6 +392,36 @@ def cmd_review(args) -> int:
         print(f"      Wikidata: {desc[:150] or '(no English description)'}; {editions} Wikipedia editions")
         print(f"      proposed by {d['reviewer']} via {d['method']}" + (f": {d['note']}" if d["note"] else ""))
         print(f"      acat review approve {d['from']} {d['to']} --reviewer \"<your name>\"\n")
+    return 0
+
+
+def cmd_eval(args) -> int:
+    from .evaluate import PANEL, run
+    conn = dbm.connect(args.db)
+    dbm.init_schema(conn)
+    langs = tuple(args.langs.split(",")) if args.langs else PANEL
+    systems = tuple(args.systems.split(",")) if args.systems else None
+    res = run(conn, langs, systems, boot=args.boot, perms=args.perms)
+    print(f"\nrun {res['run_id']}: {res['queries']} known-item queries in {len(langs)} languages, each language hidden"
+          " from the index while its queries run (95% bootstrap intervals)")
+    print(f"{'system':12s} {'MRR@10':>22s} {'Recall@10':>10s} {'nDCG@10':>8s}  worst language")
+    for s, v in res["summary"].items():
+        macro = {m: (val, lo, hi) for lang, m, val, lo, hi, n in v["rows"] if lang == ""}
+        worst = [r for r in v["rows"] if r[0] == "*worst"]
+        mrr = macro["mrr@10"]
+        print(f"{s:12s} {mrr[0]:8.3f} [{mrr[1]:.3f}, {mrr[2]:.3f}] {macro['recall@10'][0]:10.3f} {macro['ndcg@10'][0]:8.3f}"
+              f"  {worst[1][1].split(':')[1]} {worst[0][2]:.3f}")
+    for t in res["tests"]:
+        print(f"  {t['a']} vs {t['b']}: macro MRR@10 difference {t['diff']:+.3f}, paired randomization p = {t['p']:.4f}")
+    return 0
+
+
+def cmd_embed(args) -> int:
+    from .embed import embed_labels
+    conn = dbm.connect(args.db)
+    stats = embed_labels(conn, args.model, tuple(args.kinds.split(",")))
+    print(f"{stats['model']}: {stats['embedded']} labels embedded ({stats['already_had']} already had vectors),"
+          f" {stats['seconds']} s")
     return 0
 
 
@@ -517,6 +553,18 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("compendium-md", help="write the compendium as Markdown")
     p.add_argument("out", nargs="?", default="docs/COMPENDIUM.md")
     p.set_defaults(fn=cmd_compendium_md)
+
+    p = sub.add_parser("eval", help="leave-one-language-out retrieval evaluation, stored in eval_* tables")
+    p.add_argument("--langs", help="comma-separated panel (default: 28 languages across scripts and regions)")
+    p.add_argument("--systems", help="comma-separated: words,trigram,lsa,dense,rrf-lexical,rrf-all")
+    p.add_argument("--boot", type=int, default=1000)
+    p.add_argument("--perms", type=int, default=10000)
+    p.set_defaults(fn=cmd_eval)
+
+    p = sub.add_parser("embed", help="dense multilingual label vectors (needs onnxruntime, tokenizers, the pinned model)")
+    p.add_argument("--model", default="e5-large-instruct")
+    p.add_argument("--kinds", default="pref", help="label kinds to embed, comma-separated (default pref)")
+    p.set_defaults(fn=cmd_embed)
 
     p = sub.add_parser("bake", help="bake the particle layout with the browser's own physics (needs Node)")
     p.add_argument("--steps", type=int, default=20000, help="step limit (default 20000)")

@@ -706,7 +706,21 @@ class App {
     if (!g) return;
     const inField = (id: string): boolean => this.index.has(id);
     if (!this.apiOnline) {
-      this.ui.showAudit(auditFromGraph(g.payload, this.sim!.primaryScheme), true, inField);
+      // a static snapshot may carry the stored audit next to its graph (acat export-graph writes both)
+      let url = "";
+      try {
+        url = new URL("audit.json", new URL(g.url, window.location.href)).href;
+      } catch {
+        url = "";
+      }
+      const offline = (): void => this.ui.showAudit(auditFromGraph(g.payload, this.sim!.primaryScheme), true, inField);
+      if (g.source === "api" || !url) {
+        offline();
+        return;
+      }
+      fetchAudit(undefined, url)
+        .then((a) => this.ui.showAudit(a, false, inField))
+        .catch(offline);
       return;
     }
     this.auditAbort?.abort();

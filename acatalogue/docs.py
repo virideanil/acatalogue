@@ -39,8 +39,9 @@ def write_compendium_md(conn: sqlite3.Connection, out: Path) -> int:
         "   AND m.status = 'accepted') AS wd"
         " FROM concept c JOIN concept_stat s ON s.concept_id = c.id WHERE c.scheme = 'acat' AND s.depth = 0"
         " AND c.status = 'active' ORDER BY c.id").fetchall()
-    seeds = conn.execute("SELECT name, sha512 FROM source WHERE kind = 'seed' AND name LIKE 'seed/compendium/%'"
-                         " ORDER BY name").fetchall()
+    # the versions the current concepts were read from (older versions stay in `source`, never deleted)
+    seeds = conn.execute("SELECT DISTINCT s.name, s.sha512 FROM source s JOIN concept c ON c.source_sha512 = s.sha512"
+                         " WHERE s.kind = 'seed' AND s.name LIKE 'seed/compendium/%' ORDER BY s.name").fetchall()
     lines = [
         "# The ACAT Compendium",
         "",

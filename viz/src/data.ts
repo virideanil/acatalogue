@@ -756,8 +756,8 @@ function parseBaseline(o: Obj): BaselineAudit {
   };
 }
 
-export async function fetchAudit(signal?: AbortSignal): Promise<AuditResponse> {
-  const { status, json } = await fetchJson("/api/audit", signal);
+export async function fetchAudit(signal?: AbortSignal, url = "/api/audit"): Promise<AuditResponse> {
+  const { status, json } = await fetchJson(url, signal);
   if (status < 200 || status >= 300) throw new ApiError(isObj(json) ? str(json.error, `HTTP ${status}`) : `HTTP ${status}`, status);
   return parseAudit(json);
 }

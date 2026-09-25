@@ -43,7 +43,33 @@ def concept_texts(conn: sqlite3.Connection, scheme: str = "acat") -> list[tuple[
     return [(r[0], " ".join([r[1]] * 3 + [r[2], r[3], r[4]])) for r in rows]
 
 
-def build(conn: sqlite3.Connection, dims: int = 48, k: int = 6, actor: str = "acat semantic") -> dict:
+class LsaFit:
+    """A fitted LSA space: concept vectors, and what is needed to fold a new text into it."""
+
+    def __init__(self, ids, items, col, idf, A, U, evals, Vn):
+        self.ids, self.items, self.col, self.idf, self.A, self.U, self.evals, self.Vn = ids, items, col, idf, A, U, evals, Vn
+        self._W = None                                   # term -> component projection, built on first use
+
+    def embed(self, text: str):
+        """Fold a text in: q Aᵀ U S⁻¹, the query's coordinates on the fitted components (unit length)."""
+        import numpy as np
+        q = np.zeros(len(self.col))
+        counts: dict[int, int] = {}
+        for t in tokenize(text):
+            j = self.col.get(t)
+            if j is not None:
+                counts[j] = counts.get(j, 0) + 1
+        for j, c in counts.items():
+            q[j] = (1.0 + np.log(c)) * self.idf[j]
+        if self._W is None:
+            s = np.sqrt(self.evals)
+            self._W = (self.A.T @ self.U) / np.where(s == 0, 1, s)
+        v = q @ self._W
+        norm = np.linalg.norm(v)
+        return v / norm if norm > 0 else v
+
+
+def fit(conn: sqlite3.Connection, dims: int = 48) -> LsaFit:
     try:
         import numpy as np
     except ImportError as exc:  # pragma: no cover
@@ -79,6 +105,15 @@ def build(conn: sqlite3.Connection, dims: int = 48, k: int = 6, actor: str = "ac
     V = U * np.sqrt(evals)
     vn = np.linalg.norm(V, axis=1, keepdims=True)
     Vn = V / np.where(vn == 0, 1, vn)
+    return LsaFit(ids, items, col, idf, A, U, evals, Vn)
+
+
+def build(conn: sqlite3.Connection, dims: int = 48, k: int = 6, actor: str = "acat semantic") -> dict:
+    import numpy as np
+    f = fit(conn, dims)
+    ids, items, A, evals, Vn = f.ids, f.items, f.A, f.evals, f.Vn
+    n = len(ids)
+    vocab = f.col
     S = Vn @ Vn.T
     np.fill_diagonal(S, -1.0)
     # 2-D seed layout: principal components of the concept vectors, scaled into [-1, 1]
@@ -99,7 +134,7 @@ def build(conn: sqlite3.Connection, dims: int = 48, k: int = 6, actor: str = "ac
                   json.dumps(params, sort_keys=True), manifest, utcnow()))
     for i, cid in enumerate(ids):
         conn.execute("INSERT INTO embedding(target, model, dim, vec) VALUES (?,?,?,?)",
-                     (cid, model_id, dims, struct.pack(f"<{V.shape[1]}f", *Vn[i])))
+                     (cid, model_id, dims, struct.pack(f"<{Vn.shape[1]}f", *Vn[i])))
         conn.execute("INSERT INTO layout(target, model, x, y) VALUES (?,?,?,?)",
                      (cid, model_id, float(xy[i, 0]), float(xy[i, 1])))
         for rank, j in enumerate(np.argsort(S[i])[::-1][:k]):

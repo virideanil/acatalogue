@@ -333,6 +333,50 @@ CREATE TABLE IF NOT EXISTS audit_metric (
   PRIMARY KEY (run_id, dimension, group_id, metric, baseline)
 );
 
+-- ─── retrieval evaluation: queries, ranks, metrics, tests ──────────────────
+CREATE TABLE IF NOT EXISTS eval_run (
+  id          INTEGER PRIMARY KEY,
+  at          TEXT NOT NULL,
+  ledger_head TEXT NOT NULL,            -- the catalogue state the numbers describe
+  params      TEXT NOT NULL             -- JSON: languages, k, depth, seed, systems, dense model
+);
+CREATE TABLE IF NOT EXISTS eval_query (
+  run_id INTEGER NOT NULL REFERENCES eval_run(id),
+  qid    INTEGER NOT NULL,
+  lang   TEXT NOT NULL,                 -- hidden from the index while this query runs
+  text   TEXT NOT NULL,
+  target TEXT NOT NULL,                 -- the one relevant concept
+  PRIMARY KEY (run_id, qid)
+);
+CREATE TABLE IF NOT EXISTS eval_rank (
+  run_id INTEGER NOT NULL REFERENCES eval_run(id),
+  system TEXT NOT NULL,
+  qid    INTEGER NOT NULL,
+  rank   INTEGER,                       -- 1-based rank of the target; NULL = not in the top 100
+  PRIMARY KEY (run_id, system, qid)
+);
+CREATE TABLE IF NOT EXISTS eval_metric (
+  run_id INTEGER NOT NULL REFERENCES eval_run(id),
+  system TEXT NOT NULL,
+  lang   TEXT NOT NULL,                 -- '' = macro-average over languages, '*worst' = worst language
+  metric TEXT NOT NULL,                 -- 'mrr@10', 'recall@10', 'ndcg@10'
+  value  REAL,
+  lo     REAL,                          -- bootstrap 95% interval
+  hi     REAL,
+  n      INTEGER,
+  PRIMARY KEY (run_id, system, lang, metric)
+);
+CREATE TABLE IF NOT EXISTS eval_test (
+  run_id      INTEGER NOT NULL REFERENCES eval_run(id),
+  a           TEXT NOT NULL,
+  b           TEXT NOT NULL,
+  metric      TEXT NOT NULL,
+  diff        REAL NOT NULL,            -- a minus b
+  p           REAL NOT NULL,            -- paired randomization test, two-sided
+  permutations INTEGER NOT NULL,
+  PRIMARY KEY (run_id, a, b, metric)
+);
+
 -- ─── derived: statistics, semantic vectors, layout ──────────────────────────
 CREATE TABLE IF NOT EXISTS concept_stat (
   concept_id  TEXT PRIMARY KEY REFERENCES concept(id),

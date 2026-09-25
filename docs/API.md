@@ -50,12 +50,15 @@ Every record has a **scoped, resolvable id**: `<scope>/<code>`.
       "mass": 3.2,
       "langs": 187,
       "docs": 1,
-      "xy": [0.12, -0.40]
+      "xy": [0.12, -0.40],
+      "pos": [-214.3, 87.9]
     }
   ],
   "edges": [
     {"s": 12, "t": 3, "k": "broader", "w": 1.0}
-  ]
+  ],
+  "layout": {"model": "layout/physics-731c56d68b6d8d37", "steps": 2656, "asleep": true,
+             "complete": true, "stale": false}
 }
 ```
 
@@ -74,6 +77,13 @@ Node fields:
   This is the input of the *coverage lens*.
 - `docs` — number of corpus documents attached.
 - `xy` — optional semantic seed position in `[-1, 1]²` (from the semantic layer), or `null`.
+- `pos` — position baked offline by `acat bake` (world units of the physics), or `null`.
+
+`layout` (or `null` when nothing is baked): the layout model the positions come from, named by the
+SHA-512 of the physics modules that computed them; `steps` it took; `asleep` — it ended at rest, not at
+its step limit; `complete` — every node has a `pos`; `stale` — it was computed for a different graph
+(the positions remain a good start, and the browser relaxes from them). The browser adopts a complete
+layout and starts at rest; otherwise it settles live.
 
 Edge fields: `s`, `t` are indices into `nodes`. `k` is one of:
 
@@ -142,15 +152,31 @@ Query parameters:
   "broader":   [{"id": "acat/matter", "label": "Matter & Energy"}],
   "narrower":  [{"id": "acat/mechanics", "label": "Mechanics"}],
   "related":   [{"id": "acat/chemistry", "label": "Chemistry"}],
-  "mappings":  [{"id": "wd/Q413", "label": "physics", "relation": "exactMatch", "method": "search+review", "status": "accepted"}],
+  "mappings":  [{"id": "wd/Q413", "label": "physics", "relation": "exactMatch", "method": "sparql-label+review",
+                 "status": "accepted", "reviewer": "claude (AI agent, session 2026-09-25)", "decided_by": "AI agent", "note": "…"}],
   "documents": [{"id": "doc/…/Physics", "title": "Physics", "lang": "en", "url": "https://en.wikipedia.org/wiki/Physics", "license": "CC BY-SA 4.0", "excerpt": "…", "sha512": "…"}],
-  "claims":    [{"subject": "wd/Q413", "predicate": "wd/P279", "predicate_label": "subclass of", "object": "wd/Q336", "object_label": "science", "epistemic": "epistemic/attributed", "rank": "normal", "source": "src/sha512:…"}],
+  "claims":    [{"subject": "wd/Q413", "predicate": "wd/P279", "predicate_label": "subclass of", "object": "wd/Q336",
+                 "object_label": "science", "value": null, "snak_type": "value", "datatype": "wikibase-item",
+                 "statement_id": "Q413$…", "pointer": "/entities/Q413/claims/P279/0", "qualifiers": 0,
+                 "references": 1, "sourced": true, "valid_from": null, "valid_to": null,
+                 "epistemic": "epistemic/attributed", "rank": "normal", "source": "src/sha512:…"}],
   "neighbors": [{"id": "acat/chemistry", "label": "Chemistry", "score": 0.71, "model": "lsa-tfidf-svd"}],
   "provenance": [{"source": "seed/compendium/acat/01-matter.tsv", "sha512": "…", "kind": "seed"}]
 }
 ```
 
 Every list may be empty. `labels` can hold hundreds of entries (one or more per language).
+
+- `mappings[].decided_by` — who stands behind the decision: `AI agent`, `human` (after a review in
+  `seed/reviews/`), or `seed file (no named reviewer)`. `note` names the original proposal when a person
+  revised it.
+- `claims` — current claims only (superseded ones stay in the database). For statement-level claims:
+  `statement_id` is Wikidata's statement GUID and `pointer` an RFC 6901 JSON Pointer into the stored
+  source bytes (`source`); `snak_type` is `value`, `somevalue` ("unknown value") or `novalue` ("no
+  value"); `value` holds a literal (text, or canonical JSON for time, quantity, monolingual text and
+  coordinates) when `object` is null; `sourced` is true when some reference says more than "imported
+  from a Wikimedia project"; `valid_from`/`valid_to` are ISO 8601 / EDTF text (astronomical years).
+- `reviews` — decisions recorded about this concept, its labels or its mappings.
 
 ## `GET /api/audit`
 
@@ -164,9 +190,34 @@ Every list may be empty. `labels` can hold hundreds of entries (one or more per 
   "thinnest": [{"id": "acat/…", "label": "…", "langs": 2}],
   "regions":  [{"id": "space/m49-002", "label": "Africa", "tagged": 12}],
   "label_languages": [{"lang": "en", "concepts": 600}],
-  "notes": ["…"]
+  "notes": ["…"],
+  "baseline_audit": {
+    "run_id": 4, "generated_at": "…", "ledger_head": "…",
+    "params": {"seed": 20260925, "bootstrap": 2000, "baselines": ["population", "land_area", "equal"]},
+    "regions": {
+      "n": 65, "k": 6, "entropy_norm": 0.87, "tagged_above_level": 0, "untagged": 534,
+      "groups": [{"id": "space/m49-142", "label": "Asia", "share": 0.392, "share_lo": 0.283, "share_hi": 0.514,
+                  "vs": {"population": {"baseline": 0.588, "rr": 0.667, "log2_rr": -0.58, "rr_lo": 0.48, "rr_hi": 0.87}}}],
+      "distribution": {"population": {"jsd_bits": 0.076, "jsd_lo": 0.039, "jsd_hi": 0.139, "null_p95": 0.027,
+                                      "exceeds_null": true, "gini_rr": 0.66}},
+      "baseline_coverage": {"population": {"as_of": "2024", "areas_with_value": 215, "areas": 248, "without_value": ["…"]}}
+    },
+    "subregions": {"…": "same shape"},
+    "siblings": [{"parent": "acat/philosophy", "label": "Philosophy", "children": 10, "quantities": {"subtree": {"cv": 1.29}},
+                  "flags": [{"id": "acat/philosophical-traditions", "subtree": 11, "median": 1}]}],
+    "attention": {"median": 85, "median_all": 85, "concepts_with_bot_editions": 310, "excluded_editions": ["cebwiki", "warwiki"]},
+    "evidence": {"all": {"statements": 48210, "sourced": 8222}, "hierarchy": {"statements": 2441, "sourced": 247}},
+    "review": {"accepted_by_decider": {"AI agent": {"exactMatch": 399}}, "human_reviews": 0}
+  }
 }
 ```
+
+`baseline_audit` is the newest run stored by `acat build` (tables `audit_run`, `audit_metric`), or
+`null`. Shares count each place-tagged concept once, split evenly over its regions; `rr` is the share
+divided by the baseline's share (`null` when the baseline has no value); intervals are 95% Wilson
+intervals; `jsd_*` is the Jensen–Shannon divergence in bits with a bootstrap interval, compared with
+the 95th percentile of random samples drawn from the baseline itself. The three baselines are
+declared choices: none is "the fair one".
 
 ## `GET /api/stats`
 

@@ -456,8 +456,8 @@ function parseBaseline(o) {
         human_reviews: num(rev.human_reviews),
     };
 }
-export async function fetchAudit(signal) {
-    const { status, json } = await fetchJson("/api/audit", signal);
+export async function fetchAudit(signal, url = "/api/audit") {
+    const { status, json } = await fetchJson(url, signal);
     if (status < 200 || status >= 300)
         throw new ApiError(isObj(json) ? str(json.error, `HTTP ${status}`) : `HTTP ${status}`, status);
     return parseAudit(json);
