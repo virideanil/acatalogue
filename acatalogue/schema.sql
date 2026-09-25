@@ -19,7 +19,7 @@
 
 -- user_version is the schema version; acatalogue/migrate.py upgrades older databases in place
 -- (copying every row that must never be lost) before this file runs.
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS label (
   id            INTEGER PRIMARY KEY,   -- stable rowid: the label indexes point at it (VACUUM-safe)
   concept_id    TEXT NOT NULL REFERENCES concept(id),
   lang          TEXT NOT NULL,         -- Wikimedia / BCP 47 language code
-  kind          TEXT NOT NULL CHECK (kind IN ('pref', 'alt', 'desc')),
+  kind          TEXT NOT NULL CHECK (kind IN ('pref', 'alt', 'hidden', 'desc')),  -- hidden: searchable, not shown
   text          TEXT NOT NULL,         -- NFC-normalised
   source_sha512 TEXT REFERENCES source(sha512),
   UNIQUE (concept_id, lang, kind, text)
@@ -436,7 +436,30 @@ BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS ledger_no_delete BEFORE DELETE ON ledger
 BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END;
 
+-- ─── sources integrated from the local store (acatalogue/integrate.py) ──────
+-- one row per integration, never rewritten: which lean file (by SHA-512) fed which scheme, in which mode
+CREATE TABLE IF NOT EXISTS lean_integration (
+  id              INTEGER PRIMARY KEY,
+  scheme          TEXT NOT NULL,
+  source          TEXT NOT NULL,             -- the registry's id
+  snapshot        TEXT NOT NULL,             -- the store manifest that was converted, e.g. 'geonames-20260925'
+  manifest_sha512 TEXT,
+  lean_sha512     TEXT NOT NULL,             -- the lean file (registered in `source`, kind 'file')
+  lean_path       TEXT NOT NULL,             -- where it is on this machine
+  mode            TEXT NOT NULL CHECK (mode IN ('full', 'attach', 'removed')),
+  counts          TEXT NOT NULL,             -- JSON
+  at              TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS lean_integration_no_update BEFORE UPDATE ON lean_integration
+BEGIN SELECT RAISE(ABORT, 'integrations are recorded, never rewritten'); END;
+CREATE TRIGGER IF NOT EXISTS lean_integration_no_delete BEFORE DELETE ON lean_integration
+BEGIN SELECT RAISE(ABORT, 'integrations are recorded, never rewritten'); END;
+
 -- ─── views ──────────────────────────────────────────────────────────────────
+DROP VIEW IF EXISTS v_lean_source;
+CREATE VIEW v_lean_source AS              -- the current integration of each scheme
+  SELECT i.* FROM lean_integration i
+  WHERE i.id = (SELECT max(j.id) FROM lean_integration j WHERE j.scheme = i.scheme);
 CREATE VIEW IF NOT EXISTS v_concept AS
   SELECT c.id, c.scheme, c.code, c.label, c.status, s.root, s.depth, s.descendants,
          s.docs, s.sitelinks, s.label_langs, c.scope_note

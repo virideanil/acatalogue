@@ -273,6 +273,22 @@ def cmd_verify(args) -> int:
         good, msg = c.verify()
         print(f"corpus: {msg}" + ("" if c.sealed else "  (NOT sealed)"))
         ok &= good and c.sealed
+    from .registry import read as read_registry
+    reg = read_registry()
+    print(f"source registry: {len(reg.sources)} sources, {sum(len(v) for v in reg.files.values())} files, "
+          f"{len(reg.presets)} presets: " + ("valid" if not reg.problems else f"{len(reg.problems)} problems"))
+    for p in reg.problems[:20]:
+        print("  ", p)
+    ok &= not reg.problems
+    from .store import root as store_root
+    if (store_root() / "store.sqlite").exists():               # this machine's downloaded sources
+        from .sources_cli import _verify as verify_store
+        from .store import Store
+        st = Store()
+        try:
+            ok &= verify_store(args, st, reg) == 0
+        finally:
+            st.close()
     if Path(args.db).exists():
         from .checks import database_checks, skos_checks
         good, n, msg = ledger.verify(_ro(args))
@@ -589,6 +605,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--under", help="queue: only concepts under this one")
     p.add_argument("-n", "--limit", type=int, default=10)
     p.set_defaults(fn=cmd_review)
+
+    from .sources_cli import add_parser as add_sources_parser
+    add_sources_parser(sub)
 
     p = sub.add_parser("fetch", help="fetch a source into a new dated, sealed corpus")
     p.add_argument("source", choices=["m49", "external", "wikidata", "wikidata-statements", "wikipedia",

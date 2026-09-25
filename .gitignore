@@ -9,3 +9,6 @@ __pycache__/
 *.egg-info/
 build/
 .venv/
+
+# the local store of downloaded and converted sources (acat sources); ACAT_STORE moves it
+store/

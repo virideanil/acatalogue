@@ -1,0 +1,357 @@
+"""Download, seal, convert and integrate the selected sources: each stage starts as soon as its input
+is ready, so conversions run while other files are still downloading.
+
+  download   threads (per-host politeness in download.py); a source's files land in raw/<source>/<day>/
+  seal       when every file of a source is in, its manifest (store/corpora/<snapshot>) records each
+             file's SHA-512, size, URL, time and licence, and is sealed
+  convert    worker processes: sealed manifest -> lean file (store/lean/<source>/), inputs re-verified
+  integrate  the catalogue's one writer: lean file -> catalogue (acatalogue/integrate.py), then the
+             search indexes and statistics are rebuilt once
+
+Every stage is resumable: partial downloads continue, a finished conversion of the same manifest by the
+same converter version is reused, and integrating the same lean file again does nothing. State lives in
+store.sqlite (download, job, event); the catalogue's ledger records every integration.
+"""
+from __future__ import annotations
+
+import concurrent.futures as cf
+import json
+import multiprocessing
+import os
+import threading
+import traceback
+from pathlib import Path
+
+from .corpusfile import CorpusFile
+from .download import Downloader, Task
+from .util import sha512_file, today_compact, utcnow
+
+
+def snapshot_for(store, source: str, *, refresh: bool = False) -> tuple[str, bool]:
+    """(snapshot name, already sealed?): the unsealed one being downloaded, else the newest sealed one,
+    else (or with refresh) a new dated one."""
+    rows = sorted(p.parent.name for p in (store.root / "corpora").glob(f"{source}-*/corpus.sqlite")
+                  if p.parent.name[len(source) + 1:].split("-")[0].isdigit())
+    newest_sealed = None
+    for name in reversed(rows):
+        c = CorpusFile(store.corpus_path(name), readonly=True)
+        try:
+            if not c.sealed:
+                return name, False
+            newest_sealed = newest_sealed or name
+        finally:
+            c.close()
+    if newest_sealed and not refresh:
+        return newest_sealed, True
+    day = today_compact()
+    name, k = f"{source}-{day}", 2
+    while store.corpus_path(name).exists():
+        name, k = f"{source}-{day}-{k}", k + 1
+    return name, False
+
+
+def _day(snapshot: str, source: str) -> str:
+    return snapshot[len(source) + 1:]
+
+
+def open_manifest(store, reg, source: str, snapshot: str) -> CorpusFile:
+    path = store.corpus_path(snapshot)
+    e = reg.sources[source]
+    c = CorpusFile(path, create=not path.exists(), name=snapshot, title=e["title"], license=e.get("license"),
+                   description=f"{e.get('publisher') or ''}: files of {source} as published".strip(": "))
+    raw = store.raw_dir(source, _day(snapshot, source))
+    c.set_external_root(os.path.relpath(raw, path.parent))
+    return c
+
+
+def seal(store, reg, source: str, snapshot: str) -> str:
+    """Record every downloaded file (re-hashed) in the manifest and seal it."""
+    c = open_manifest(store, reg, source, snapshot)
+    try:
+        if not c.sealed:
+            e = reg.sources[source]
+            for d in store.conn.execute("SELECT * FROM download WHERE snapshot = ? ORDER BY name", (snapshot,)):
+                if d["state"] != "done":
+                    raise RuntimeError(f"{snapshot}: {d['name']} is {d['state']}")
+                c.add_external(d["name"], d["sha512"], d["bytes_done"], url=d["url"], content_type=d["content_type"],
+                               retrieved_at=d["finished_at"], license=e.get("license"),
+                               attribution=e.get("publisher"))
+            c.seal()
+            store.event(source, "seal", "info", f"{snapshot} sealed: manifest {c.manifest()[:16]}…")
+        return c.meta()["manifest_sha512"]
+    finally:
+        c.close()
+
+
+def convert_job(args: dict) -> dict:
+    """Run in a worker process: sealed manifest -> lean file. Inputs are re-verified before reading."""
+    from .convert import VERSION, Input, registry
+    from .lean import LeanWriter
+    c = CorpusFile(args["manifest_path"], readonly=True)
+    inputs = []
+    try:
+        for it in c.items():
+            path = c.external_path(it["name"])
+            digest, n = sha512_file(path)
+            if (digest, n) != (it["sha512"], it["bytes"]):
+                raise ValueError(f"{path}: bytes differ from the sealed manifest")
+            inputs.append(Input(it["name"], path, digest, n, it["url"], it["retrieved_at"]))
+    finally:
+        c.close()
+    e = args["entry"]
+    out = Path(args["out"])
+    w = LeanWriter(out, source=e["id"], title=e["title"], converter=e["converter"], version=VERSION,
+                   license=e.get("license"), attribution=e.get("publisher"), homepage=e.get("homepage"),
+                   snapshot=args["snapshot"], manifest_sha512=args["manifest_sha512"])
+    lines: list[str] = []
+    try:
+        for i in inputs:
+            w.input(i.name, i.sha512, i.bytes, i.url, i.retrieved_at)
+        registry()[e["converter"]](inputs, w, json.loads(e.get("options") or "{}"), lines.append)
+        res = w.finish()
+    except BaseException:
+        w.abort()
+        raise
+    res["log"] = lines
+    return res
+
+
+class Pipeline:
+    def __init__(self, store, reg, *, db_path=None, workers: int = 4, converters: int | None = None,
+                 per_host: int = 1, min_interval: float = 1.0, integrate: bool = True, refresh: bool = False,
+                 progress=print):
+        self.store, self.reg = store, reg
+        self.db_path = db_path
+        self.workers = workers
+        self.converters = converters or max(1, min(2, (os.cpu_count() or 2) - 1))
+        self.integrate_after = integrate
+        self.refresh = refresh
+        self.say = progress
+        self.dl = Downloader(store, per_host=per_host, min_interval=min_interval, progress=progress)
+        self.lock = threading.Lock()
+
+    # ── plan ──
+    def plan(self, sources: list[str]) -> list[dict]:
+        out = []
+        for s in sources:
+            snap, sealed = snapshot_for(self.store, s, refresh=self.refresh)
+            files = self.reg.files.get(s, [])
+            done = {r["name"] for r in self.store.conn.execute(
+                "SELECT name FROM download WHERE snapshot = ? AND state = 'done'", (snap,))}
+            job = self.store.conn.execute("SELECT state, output FROM job WHERE snapshot = ? AND stage = 'convert'",
+                                          (snap,)).fetchone()
+            known = [int(f["bytes"]) for f in files if (f.get("bytes") or "").isdigit()]
+            out.append({"source": s, "snapshot": snap, "sealed": sealed, "files": len(files),
+                        "downloaded": len(done) if not sealed else len(files),
+                        "bytes": sum(known) if len(known) == len(files) else None,
+                        "converted": bool(job and job["state"] == "done" and Path(self.store.abs(job["output"])).exists()),
+                        "license": self.reg.sources[s].get("license"), "mode": self.reg.mode(s)})
+        return out
+
+    # ── run ──
+    def run(self, sources: list[str]) -> dict:
+        results: dict[str, dict] = {s: {} for s in sources}
+        snaps = {s: snapshot_for(self.store, s, refresh=self.refresh) for s in sources}
+        pending_files: dict[str, int] = {}
+        ctx = multiprocessing.get_context("spawn")        # never fork a process that has download threads
+        with cf.ThreadPoolExecutor(self.workers, thread_name_prefix="dl") as dpool, \
+                cf.ProcessPoolExecutor(self.converters, mp_context=ctx) as cpool:
+            conversions: dict[cf.Future, str] = {}
+
+            def start_conversion(s: str) -> None:
+                snap, _ = snaps[s]
+                try:
+                    manifest = seal(self.store, self.reg, s, snap)
+                except Exception as exc:
+                    results[s]["error"] = f"seal: {exc}"
+                    self.store.event(s, "seal", "error", str(exc))
+                    return
+                results[s]["manifest_sha512"] = manifest
+                from .convert import VERSION
+                job = self.store.conn.execute("SELECT * FROM job WHERE snapshot = ? AND stage = 'convert'",
+                                              (snap,)).fetchone()
+                if job and job["state"] == "done" and job["input"] == f"{manifest}|{VERSION}" and \
+                        Path(self.store.abs(job["output"])).exists():
+                    results[s]["lean"] = self.store.abs(job["output"])
+                    self.say(f"  {s}: converted already ({Path(job['output']).name})")
+                    return
+                out = self.store.lean_dir(s) / f"{snap}.sqlite"
+                self.store.conn.execute(
+                    "INSERT INTO job(snapshot, stage, source, state, input, output, started_at) VALUES (?,?,?,?,?,?,?)"
+                    " ON CONFLICT(snapshot, stage) DO UPDATE SET state = 'running', input = excluded.input,"
+                    " started_at = excluded.started_at, error = NULL",
+                    (snap, "convert", s, "running", f"{manifest}|{VERSION}", self.store.rel(out), utcnow()))
+                self.say(f"  {s}: converting {snap} ({self.reg.sources[s]['converter']})")
+                fut = cpool.submit(convert_job, {"manifest_path": str(self.store.corpus_path(snap)),
+                                                 "entry": dict(self.reg.sources[s]), "snapshot": snap,
+                                                 "manifest_sha512": manifest, "out": str(out)})
+                conversions[fut] = s
+
+            def downloaded(fut: cf.Future, s: str, name: str) -> None:
+                try:
+                    fut.result()
+                except Exception as exc:
+                    with self.lock:
+                        results[s].setdefault("failed_files", []).append(f"{name}: {exc}")
+                    self.say(f"  {s}/{name}: FAILED {exc}")
+                with self.lock:
+                    pending_files[s] -= 1
+
+            futures = []
+            for s in sources:
+                snap, sealed = snaps[s]
+                if sealed:
+                    continue
+                files = self.reg.files.get(s, [])
+                pending_files[s] = len(files)
+                raw = self.store.raw_dir(s, _day(snap, s))
+                for f in files:
+                    t = Task(s, snap, f["name"], f["url"], raw / f["name"], checksum=f.get("checksum") or None,
+                             expected_bytes=int(f["bytes"]) if (f.get("bytes") or "").isdigit() else None,
+                             license=self.reg.sources[s].get("license"), attribution=self.reg.sources[s].get("publisher"))
+                    fut = dpool.submit(self.dl.fetch, t)
+                    fut.add_done_callback(lambda fu, s=s, n=f["name"]: downloaded(fu, s, n))
+                    futures.append((s, fut))
+                self.say(f"  {s}: {len(files)} file(s) queued into {self.store.rel(raw)}")
+            started: set[str] = set()
+            for s in sources:                             # sealed earlier: straight to conversion
+                if snaps[s][1]:
+                    start_conversion(s)
+                    started.add(s)
+            try:
+                while True:
+                    for s in sources:
+                        with self.lock:
+                            ready = s not in started and pending_files.get(s) == 0
+                        if ready:
+                            started.add(s)
+                            if results[s].get("failed_files"):
+                                self.say(f"  {s}: not converted: {len(results[s]['failed_files'])} file(s) failed")
+                                continue
+                            start_conversion(s)
+                    done, _ = cf.wait(list(conversions), timeout=0.5, return_when=cf.FIRST_COMPLETED) \
+                        if conversions else (set(), set())
+                    for fut in done:
+                        s = conversions.pop(fut)
+                        self._converted(s, snaps[s][0], fut, results)
+                    if len(started) == len(sources) and not conversions:
+                        break
+                    if not conversions and not done:
+                        cf.wait([f for _, f in futures], timeout=0.5, return_when=cf.FIRST_COMPLETED)
+            except KeyboardInterrupt:
+                self.dl.stop.set()
+                self.say("  interrupted: partial downloads stay as .part files and resume next time")
+                raise
+        if self.integrate_after:
+            results["_integration"] = self.integrate([s for s in sources if results[s].get("lean")])
+        return results
+
+    def _converted(self, s: str, snap: str, fut: cf.Future, results: dict) -> None:
+        try:
+            res = fut.result()
+        except Exception as exc:
+            err = "".join(traceback.format_exception_only(type(exc), exc)).strip()
+            self.store.conn.execute("UPDATE job SET state = 'failed', error = ?, finished_at = ? WHERE snapshot = ?"
+                                    " AND stage = 'convert'", (err[:2000], utcnow(), snap))
+            self.store.event(s, "convert", "error", err[:500])
+            results[s]["error"] = f"convert: {err}"
+            self.say(f"  {s}: conversion FAILED: {err}")
+            return
+        self.store.conn.execute("UPDATE job SET state = 'done', output_sha512 = ?, finished_at = ?, detail = ?"
+                                " WHERE snapshot = ? AND stage = 'convert'",
+                                (res["sha512"], utcnow(), json.dumps({"counts": res["counts"], "dropped": res["dropped"],
+                                                                      "bytes": res["bytes"]}), snap))
+        for line in res.get("log", []):
+            self.say(f"  {s}:{line}")
+        self.store.event(s, "convert", "info", f"{snap}: {res['counts']}")
+        results[s]["lean"] = Path(res["path"])
+        c = res["counts"]
+        self.say(f"  {s}: converted: {c['term']:,} terms, {c['label']:,} names, {c['rel']:,} relations,"
+                 f" {c['attr']:,} attributes, {c['link']:,} links ({res['bytes'] / 1e6:,.1f} MB)")
+
+    # ── integrate ──
+    def integrate(self, sources: list[str]) -> dict:
+        from . import db as dbm
+        from .build import compute_stats, rebuild_search
+        from .integrate import Resolver, integrate
+        if not sources:
+            return {}
+        conn = dbm.connect(self.db_path) if self.db_path else dbm.connect()
+        dbm.init_schema(conn)
+        out = {}
+        resolver = Resolver(list(self.reg.sources.values()))
+        selected = self.store.selected()
+        try:
+            for s in sources:
+                lean, snap, manifest = self.latest_lean(s)
+                if lean is None:
+                    continue
+                mode = self.reg.mode(s, selected[s]["mode"] if s in selected else None)
+                self.say(f"  {s}: integrating ({mode})")
+                conn.execute("BEGIN")
+                try:
+                    out[s] = integrate(conn, lean, self.reg.sources[s], snapshot=snap, manifest_sha512=manifest,
+                                       mode=mode, resolver=resolver, store_path=self.store.rel(lean), progress=self.say)
+                    conn.commit()
+                except BaseException:
+                    conn.rollback()
+                    raise
+                self.store.conn.execute(
+                    "INSERT INTO job(snapshot, stage, source, state, input, finished_at, detail) VALUES (?,?,?,?,?,?,?)"
+                    " ON CONFLICT(snapshot, stage) DO UPDATE SET state = 'done', input = excluded.input,"
+                    " finished_at = excluded.finished_at, detail = excluded.detail",
+                    (snap, "integrate", s, "done", out[s].get("lean_sha512"), utcnow(),
+                     json.dumps({k: v for k, v in out[s].items() if isinstance(v, (int, str))})))
+            if any(not v.get("skipped") for v in out.values()):
+                conn.execute("BEGIN")
+                self.say("  rebuilding search indexes and statistics")
+                rebuild_search(conn)
+                compute_stats(conn)
+                conn.commit()
+        finally:
+            conn.close()
+        return out
+
+    def latest_lean(self, s: str) -> tuple[Path | None, str | None, str | None]:
+        row = self.store.conn.execute(
+            "SELECT snapshot, output, input FROM job WHERE source = ? AND stage = 'convert' AND state = 'done'"
+            " ORDER BY finished_at DESC LIMIT 1", (s,)).fetchone()
+        if row is None or not self.store.abs(row["output"]).exists():
+            return None, None, None
+        return self.store.abs(row["output"]), row["snapshot"], (row["input"] or "").split("|")[0]
+
+
+def integrate_store(conn, *, actor: str = "acat build", say=print) -> dict:
+    """For `acat build` (inside its transaction): every selected source whose conversion is done is
+    integrated (nothing to do when its lean file is already current), and every integrated source that
+    is no longer selected is retired. A missing store means there is nothing to integrate."""
+    from .integrate import Resolver, integrate, retire
+    from .registry import read
+    from .store import Store, root
+    if not (root() / "store.sqlite").exists():
+        return {}
+    store = Store()
+    try:
+        reg = read(store)
+        if reg.problems:
+            raise ValueError("source registry problems:\n  " + "\n  ".join(reg.problems[:20]))
+        sel = store.selected()
+        resolver = Resolver(list(reg.sources.values()))
+        p = Pipeline(store, reg, integrate=False, progress=say)
+        out = {}
+        for s, row in sel.items():
+            if s not in reg.sources:
+                say(f"sources: {s} is selected but no longer in the registry; skipped")
+                continue
+            lean, snap, manifest = p.latest_lean(s)
+            if lean is None:
+                continue
+            out[s] = integrate(conn, lean, reg.sources[s], snapshot=snap, manifest_sha512=manifest,
+                               mode=reg.mode(s, row["mode"]), resolver=resolver, store_path=store.rel(lean),
+                               actor=actor, progress=say)
+        for scheme, source, mode in conn.execute("SELECT scheme, source, mode FROM v_lean_source").fetchall():
+            if mode != "removed" and source not in sel:
+                out[source] = retire(conn, scheme, source, actor)
+        return out
+    finally:
+        store.close()

@@ -192,6 +192,14 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
             report["documents"] = wikipedia.import_documents(conn, c, title_to_concepts, ACTOR)
             say(f"documents ({c.name}): {report['documents']}")
 
+        # sources chosen in the local store (acat sources): integrated before crosswalks are linked, so
+        # seeds may map to their concepts; deselected ones are retired (deprecated, superseded)
+        from .pipeline import integrate_store
+        integrated = integrate_store(conn, actor=ACTOR, say=say)
+        if integrated:
+            report["sources"] = {k: {x: y for x, y in v.items() if isinstance(y, (int, str))} for k, v in integrated.items()}
+            say(f"sources: {report['sources']}")
+
         link = compendium.link_facets_and_mappings(conn, schemes)
         report["links"] = {"facets": link["facets"], "mappings": link["mappings"],
                            "facets_dangling": link["facets_dangling"],

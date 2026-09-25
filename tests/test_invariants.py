@@ -129,11 +129,33 @@ class MigrationTests(unittest.TestCase):
             DROP TABLE claim; ALTER TABLE claim_old RENAME TO claim; PRAGMA user_version = 2;""")
         conn.execute("DROP TABLE review")                     # v2 had no review table
         conn.commit()
-        self.assertEqual(migrate(conn), ["2->3", "3->4"])
+        self.assertEqual(migrate(conn), ["2->3", "3->4", "4->5"])
         self.assertIn("valid_from_day", [r[1] for r in conn.execute("PRAGMA table_info(claim)")])
         self.assertEqual(conn.execute("SELECT count(*) FROM claim").fetchone()[0], 3)
-        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
-        self.assertEqual(conn.execute("SELECT count(*) FROM ledger WHERE action = 'migrate-schema'").fetchone()[0], 2)
+        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 5)
+        self.assertEqual(conn.execute("SELECT count(*) FROM ledger WHERE action = 'migrate-schema'").fetchone()[0], 3)
         dbm.init_schema(conn)                                  # and schema.sql then creates what is missing
         self.assertIn("relation", [r[1] for r in conn.execute("PRAGMA table_info(review)")])
         self.assertEqual(migrate(conn), [], "a migrated database needs nothing more")
+
+
+class LabelMigrationTests(unittest.TestCase):
+    def test_v4_to_v5_keeps_label_ids_and_allows_hidden_labels(self):
+        from acatalogue.migrate import migrate
+        tmp = Path(tempfile.mkdtemp())
+        conn = fresh_db(tmp)
+        conn.execute("INSERT INTO scheme(id, title, origin) VALUES ('t', 'T', 'external')")
+        conn.execute("INSERT INTO concept(id, scheme, code, label) VALUES ('t/a', 't', 'a', 'A')")
+        conn.executescript("""
+            CREATE TABLE label_old (id INTEGER PRIMARY KEY, concept_id TEXT NOT NULL, lang TEXT NOT NULL,
+              kind TEXT NOT NULL CHECK (kind IN ('pref', 'alt', 'desc')), text TEXT NOT NULL, source_sha512 TEXT,
+              UNIQUE (concept_id, lang, kind, text));
+            INSERT INTO label_old VALUES (7, 't/a', 'en', 'pref', 'A', NULL), (9, 't/a', 'tr', 'alt', 'Ah', NULL);
+            DROP TABLE label; ALTER TABLE label_old RENAME TO label; PRAGMA user_version = 4;""")
+        conn.commit()
+        self.assertEqual(migrate(conn), ["4->5"])
+        self.assertEqual([tuple(r) for r in conn.execute("SELECT id, text FROM label ORDER BY id")], [(7, "A"), (9, "Ah")])
+        conn.execute("INSERT INTO label(concept_id, lang, kind, text) VALUES ('t/a', 'en', 'hidden', 'Aa')")
+        dbm.init_schema(conn)
+        self.assertEqual(conn.execute("SELECT count(*) FROM v_lean_source").fetchone()[0], 0)
+        self.assertEqual(migrate(conn), [])

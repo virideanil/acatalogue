@@ -11,6 +11,11 @@ A corpus lives at `corpora/<name>/corpus.sqlite`, where the name ends in its cre
 
 Once sealed, triggers refuse any further change: a sealed corpus is a fixed point you can
 cite. New data goes into a new dated corpus; nothing is overwritten.
+
+External items: a corpus in the local store (acatalogue/store.py) records files too large for an
+archive table. Such an item has its row in `item` (SHA-512, size, URL, time, licence) but no bytes
+in `sqlar`; the bytes are the file `<external_root>/<item name>`, where `external_root` (in meta) is
+relative to the corpus directory. `verify` streams and re-hashes them like any stored item.
 """
 from __future__ import annotations
 
@@ -18,7 +23,7 @@ import sqlite3
 import zlib
 from pathlib import Path
 
-from .util import REPO_ROOT, manifest_sha512, sha512_bytes, utcnow
+from .util import REPO_ROOT, manifest_sha512, sha512_bytes, sha512_file, utcnow
 
 CORPORA_DIR = REPO_ROOT / "corpora"
 
@@ -133,7 +138,21 @@ class CorpusFile:
         row = self.item(item_name)
         if row is None:
             raise KeyError(item_name)
+        path = self.external_path(item_name)
+        if path is not None and not self._stored(row["sha512"]):
+            raw = path.read_bytes()
+            if sha512_bytes(raw) != row["sha512"]:
+                raise ValueError(f"{path} fails its SHA-512 check")
+            return raw
         return self.blob(row["sha512"])
+
+    def _stored(self, digest: str) -> bool:
+        return self.conn.execute("SELECT 1 FROM sqlar WHERE name = ?", (f"sha512/{digest}",)).fetchone() is not None
+
+    def external_path(self, item_name: str) -> Path | None:
+        """Where an external item's bytes live (None in a corpus without external items)."""
+        root = self.meta().get("external_root")
+        return (self.path.parent / root / item_name).resolve() if root else None
 
     # ── writing ──
     def add(self, item_name: str, data: bytes, *, url: str | None = None, method: str = "GET",
@@ -160,6 +179,35 @@ class CorpusFile:
         self.conn.commit()
         return digest
 
+    def add_external(self, item_name: str, digest: str, size: int, *, url: str | None = None,
+                     status: int | None = 200, content_type: str | None = None, retrieved_at: str | None = None,
+                     license: str | None = None, attribution: str | None = None) -> str:
+        """Record a file under external_root whose SHA-512 the caller computed while writing it; it is
+        re-hashed here before it is recorded, so a manifest never names bytes it has not seen."""
+        path = self.external_path(item_name)
+        if path is None:
+            raise ValueError("this corpus has no external_root")
+        seen, n = sha512_file(path)
+        if (seen, n) != (digest, size):
+            raise ValueError(f"{path}: SHA-512/size {seen[:16]}…/{n} is not the recorded {digest[:16]}…/{size}")
+        existing = self.item(item_name)
+        if existing is not None:
+            if existing["sha512"] != digest:
+                raise ValueError(f"item {item_name!r} already holds different bytes; use a new item name")
+            return digest
+        self.conn.execute(
+            "INSERT INTO item(name, sha512, bytes, url, method, status, content_type, retrieved_at, license,"
+            " attribution) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (item_name, digest, size, url, "GET", status, content_type, retrieved_at or utcnow(), license, attribution))
+        self.conn.commit()
+        return digest
+
+    def set_external_root(self, root: str) -> None:
+        if self.meta().get("external_root") not in (None, root):
+            raise ValueError("external_root is already set to another place")
+        self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES ('external_root', ?)", (root,))
+        self.conn.commit()
+
     def log(self, url: str, status: int | None, *, sha512: str | None = None, note: str | None = None) -> None:
         self.conn.execute("INSERT INTO fetch_log(at, url, status, sha512, note) VALUES (?,?,?,?,?)",
                           (utcnow(), url, status, sha512, note))
@@ -180,9 +228,20 @@ class CorpusFile:
         return digest
 
     def verify(self) -> tuple[bool, str]:
-        """Re-hash every stored item and compare with the sealed manifest."""
-        bad = []
-        for r in self.conn.execute("SELECT name, sha512 FROM item"):
+        """Re-hash every item (stored or external) and compare with the sealed manifest. External bytes
+        that are no longer on this machine (pruned) are reported, not counted as damage."""
+        bad, absent, external = [], [], 0
+        for r in self.conn.execute("SELECT name, sha512, bytes FROM item"):
+            path = self.external_path(r["name"])
+            if path is not None and not self._stored(r["sha512"]):
+                external += 1
+                if not path.exists():
+                    absent.append(r["name"])
+                    continue
+                digest, n = sha512_file(path)
+                if (digest, n) != (r["sha512"], r["bytes"]):
+                    bad.append(f"{r['name']}: the file's SHA-512/size differ from the manifest")
+                continue
             try:
                 self.blob(r["sha512"])
             except (KeyError, ValueError) as exc:
@@ -192,7 +251,9 @@ class CorpusFile:
         m = self.meta()
         if "manifest_sha512" in m and m["manifest_sha512"] != self.manifest():
             return False, "manifest does not match the sealed manifest_sha512"
-        return True, f"{self.name}: every item re-hashed OK"
+        note = f" ({external} external" + (f", {len(absent)} not on this machine: pruned" if absent else "") + ")" \
+            if external else ""
+        return True, f"{self.name}: every item re-hashed OK{note}"
 
     def close(self) -> None:
         self.conn.close()

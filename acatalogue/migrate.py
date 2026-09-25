@@ -8,7 +8,7 @@ import sqlite3
 from . import ledger
 from .util import sha512_bytes
 
-LATEST = 4
+LATEST = 5
 DERIVED_VIEWS = ("v_claim_current", "v_claim_truthy", "v_claim_evidence")
 
 
@@ -37,7 +37,44 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
     if version < 4:
         _v3_to_v4(conn)
         done.append("3->4")
+    if version < 5:
+        _v4_to_v5(conn)
+        done.append("4->5")
     return done
+
+
+def _v4_to_v5(conn: sqlite3.Connection) -> None:
+    """v5: labels may be 'hidden' (searchable, not shown: SKOS hiddenLabel, OBO's non-exact synonyms);
+    sources integrated from the local store are recorded (lean_integration, created by schema.sql).
+    The label table is rebuilt with its row ids kept, so the label search indexes stay valid."""
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute("BEGIN")
+    try:
+        sql = "SELECT id, concept_id, lang, kind, text, source_sha512 FROM label ORDER BY id"
+        n, before = _rows_digest(conn, sql)
+        conn.execute("""CREATE TABLE label_v5 (
+            id INTEGER PRIMARY KEY, concept_id TEXT NOT NULL REFERENCES concept(id), lang TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('pref', 'alt', 'hidden', 'desc')), text TEXT NOT NULL,
+            source_sha512 TEXT REFERENCES source(sha512), UNIQUE (concept_id, lang, kind, text))""")
+        conn.execute("INSERT INTO label_v5(id, concept_id, lang, kind, text, source_sha512)"
+                     " SELECT id, concept_id, lang, kind, text, source_sha512 FROM label ORDER BY id")
+        conn.execute("DROP TABLE label")
+        conn.execute("ALTER TABLE label_v5 RENAME TO label")
+        conn.execute("CREATE INDEX IF NOT EXISTS label_lang ON label(lang)")
+        if _rows_digest(conn, sql) != (n, before):
+            raise RuntimeError("label copy does not match the original rows; nothing was changed")
+        ledger.record(conn, "acat migrate", "migrate-schema", target="schema",
+                      detail={"from": 4, "to": 5, "labels_copied": n, "label_kinds_added": ["hidden"],
+                              "new_tables": ["lean_integration"]},
+                      receipt=f"labels-sha512:{before}",
+                      undo="restore the database file from before the migration, or rebuild it from seed/ and corpora/")
+        conn.execute("PRAGMA user_version = 5")
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def _v3_to_v4(conn: sqlite3.Connection) -> None:
