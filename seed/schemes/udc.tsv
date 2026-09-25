@@ -1,0 +1,11 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+udc		Universal Decimal Classification	UDC	Faceted library classification developed from 1895 by Paul Otlet and Henri La Fontaine; maintained by the UDC Consortium. Main classes checked against the UDC Summary (udcsummary.info).
+0	udc	Science and knowledge. Organization. Computer science. Information. Documentation. Librarianship. Institutions. Publications	SCIENCE AND KNOWLEDGE. ORGANIZATION. COMPUTER SCIENCE. INFORMATION. DOCUMENTATION. LIBRARIANSHIP. INSTITUTIONS. PUBLICATIONS				0
+1	udc	Philosophy. Psychology	PHILOSOPHY. PSYCHOLOGY				1
+2	udc	Religion. Theology	RELIGION. THEOLOGY				2
+3	udc	Social sciences	SOCIAL SCIENCES				3
+5	udc	Mathematics. Natural sciences	MATHEMATICS. NATURAL SCIENCES				5
+6	udc	Applied sciences. Medicine. Technology	APPLIED SCIENCES. MEDICINE. TECHNOLOGY				6
+7	udc	The arts. Recreation. Entertainment. Sport	THE ARTS. RECREATION. ENTERTAINMENT. SPORT				7
+8	udc	Language. Linguistics. Literature	LANGUAGE. LINGUISTICS. LITERATURE				8
+9	udc	Geography. Biography. History	GEOGRAPHY. BIOGRAPHY. HISTORY				9

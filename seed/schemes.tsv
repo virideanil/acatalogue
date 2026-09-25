@@ -1,0 +1,10 @@
+id	title	origin	license	homepage	description
+acat	ACAT Compendium	authored	authored in this repository	https://github.com/virideanil/acatalogue	The authored circle of thirteen knowledge domains. No domain is on top: they are ordered by code only. Subdivisions are symmetric where the world is (regions follow UN M49; traditions are siblings, never an 'other' bucket).
+kind	Kinds of things	authored	authored in this repository	https://github.com/virideanil/acatalogue	Facet: what sort of thing something is (person, place, event, practice, work, idea…). Defined for entities and claims; not yet applied to compendium concepts.
+epistemic	Epistemic status	authored	authored in this repository	https://github.com/virideanil/acatalogue	Facet: how a statement is known. Every claim carries one; the default is 'attributed' (a named source says so; this catalogue has not judged it).
+space	UN M49 regions, countries and areas	external	UN Statistics Division public standard (cited, unmodified)	https://unstats.un.org/unsd/methodology/m49/overview/	Facet: where. The UN statistical view of regions and areas, in the six official UN languages. It is one named perspective on places, not the only one.
+udc	Universal Decimal Classification (main classes)	external	UDC Summary, UDC Consortium, CC BY-SA 3.0	https://udcsummary.info/	External scheme kept for crosswalks.
+ddc	Dewey Decimal Classification (main classes)	external	DDC is © OCLC; only class numbers and short captions are cited here	https://www.oclc.org/en/dewey.html	External scheme kept for crosswalks.
+lcc	Library of Congress Classification (classes)	external	U.S. Government work (public domain)	https://www.loc.gov/aba/cataloging/classification/lcco/	External scheme kept for crosswalks.
+propaedia	Propædia — Outline of Knowledge (parts)	external	part titles cited for crosswalking	https://www.britannica.com/	The ten parts of the Encyclopædia Britannica's Outline of Knowledge (Mortimer Adler, 1974), arranged as a circle with no part on top — the model for the ACAT circle.
+wd	Wikidata	external	CC0 1.0	https://www.wikidata.org/	Items and properties referenced by mappings and claims.

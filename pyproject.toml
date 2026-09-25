@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acatalogue"
+version = "0.1.0"
+description = "A curated, attributed catalogue of knowledge: SQLite database, named corpora, a faceted compendium, a SQL grepper and a particle view."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+semantic = ["numpy>=1.24"]
+
+[project.scripts]
+acat = "acatalogue.cli:main"
+
+[tool.setuptools]
+packages = ["acatalogue", "acatalogue.sources"]
+
+[tool.setuptools.package-data]
+acatalogue = ["schema.sql"]

@@ -1,0 +1,35 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+life		Life	biology|life sciences	Living things and their processes: cells, genes and organisms, their diversity, evolution and ecology.	earth|health
+cell-biology	life	Cell biology	cytology	The structure and function of cells, the basic units of life.	biochemistry
+molecular-biology	life	Molecular biology		How DNA, RNA and proteins carry, express and regulate genetic information.	genetics
+genetics	life	Genetics	heredity	Genes, heredity and variation in living things.	evolution
+genomics	genetics	Genomics		Whole genomes: their sequencing, structure, function and comparison.	molecular-biology|data-and-databases
+evolution	life	Evolution	evolutionary biology	Descent with modification: how populations change over generations through natural selection and other processes.	genetics|palaeontology
+speciation	evolution	Speciation		How new species arise.
+phylogenetics	evolution	Phylogenetics and systematics	systematics	Reconstructing the evolutionary relationships among organisms: the tree of life.	taxonomy-biology
+origin-of-life	evolution	Origin of life	abiogenesis	How life first arose from non-living chemistry.	astrobiology|creation-narratives
+human-evolution	evolution|prehistory	Human evolution		The evolutionary history of humans and their closest extinct relatives.	biological-anthropology|early-human-dispersals
+physiology	life	Physiology		How living organisms and their parts function.	human-physiology
+developmental-biology	life	Developmental biology		How organisms grow and develop from a single cell.
+ecology	life	Ecology		The relationships of organisms with each other and with their environment.	environmental-science
+ecosystems	ecology	Ecosystems		Communities of organisms together with their physical environment, and the flows of energy and matter through them.
+biomes	ecology	Biomes	forests|grasslands|deserts|tundra|coral reefs	Major kinds of ecosystem shaped by climate: forests, grasslands, deserts, tundra, wetlands, reefs and others.	climatology
+biogeography	ecology|physical-geography	Biogeography		Why living things are distributed where they are, across space and through time.
+conservation-biology	ecology	Biodiversity and conservation	conservation|biodiversity	The variety of life, the threats to it, and efforts to protect species and ecosystems.	sustainability|traditional-ecological-knowledge
+organisms	life	Diversity of life	living things|tree of life	The kinds of living things (and viruses) and how they are classified.
+taxonomy-biology	organisms	Biological classification	taxonomy|nomenclature	Naming and classifying organisms, from Linnaean ranks to modern phylogenetic classifications and folk taxonomies.	phylogenetics|knowledge-organization
+microorganisms	organisms	Microorganisms	microbes|microbiology	Microscopic life and its study: bacteria, archaea, protists, microscopic fungi, and viruses.	infectious-diseases
+bacteria-and-archaea	microorganisms	Bacteria and archaea	prokaryotes	Single-celled organisms without a nucleus, the oldest and most numerous forms of life.
+viruses	microorganisms	Viruses	virology	Infectious agents that replicate only inside living cells; whether they count as alive is debated.	infectious-diseases|vaccination
+protists	microorganisms	Protists		Mostly single-celled organisms with a nucleus that are not plants, animals or fungi.
+fungi	organisms	Fungi	mycology	Mushrooms, moulds and yeasts, and their study.
+plants	organisms	Plants	botany|flora	Plants and their study, from mosses to flowering trees.	crop-farming|gardening|forestry
+animals	organisms	Animals	zoology|fauna	Animals and their study.	ethology|pastoralism-and-livestock
+invertebrates	animals	Invertebrates		Animals without a backbone — insects, molluscs, worms, crustaceans and many more — the vast majority of animal species.
+fish	animals	Fish	ichthyology	Aquatic vertebrates with gills: jawless, cartilaginous and bony fishes.	fisheries-and-aquaculture
+amphibians	animals	Amphibians		Frogs, salamanders and caecilians.
+reptiles	animals	Reptiles		Turtles, lizards, snakes, crocodilians and their relatives.
+birds	animals	Birds	ornithology	Birds and their study.
+mammals	animals	Mammals	mammalogy	Mammals, including humans' closest relatives.
+ethology	life	Animal behaviour	ethology	The behaviour of animals and its evolution.	animals|psychology
+marine-biology	life	Marine biology		Life in the seas and oceans.	oceanography|fisheries-and-aquaculture

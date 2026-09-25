@@ -1,0 +1,78 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+past		Human Past	history	The human past and how it is known: prehistory, history by period, by region and by theme, archaeology and the methods of history.	society|belief|thought
+prehistory	past	Prehistory		The human past before written records. Writing arose at different times in different places, so where prehistory ends differs by region.	archaeology|human-evolution
+palaeolithic	prehistory	Palaeolithic	Old Stone Age	From the earliest known stone tools, about 3.3 million years ago, to the end of the last glacial period, about 12,000 years ago.	rock-art			-3300000/-9700
+neolithic	prehistory	Neolithic and the beginnings of farming	agricultural revolution	The shift to farming and settled village life, which began independently in several regions and at different times from about 12,000 years ago.	crop-farming|pastoralism-and-livestock
+early-human-dispersals	prehistory	Early human dispersals	out of Africa	The spread of humans out of Africa and across every continent except Antarctica, including the peopling of Sahul and the Americas.	human-evolution|migration-and-diaspora
+history-by-period	past	World history by period		The whole world's history divided into dated spans (Common Era years). Named periods such as 'Middle Ages' or 'Edo period' are regional labels and belong to regions, not to this axis.
+period-before-3000bce	history-by-period	Before 3000 BCE		The world before about 3000 BCE, including the first cities and the first writing in Mesopotamia and Egypt toward its end.				../-3000
+period-3000-2001bce	history-by-period	3rd millennium BCE		The world from 3000 to 2001 BCE.				-2999/-2000
+period-2000-1001bce	history-by-period	2nd millennium BCE		The world from 2000 to 1001 BCE.				-1999/-1000
+period-1000-1bce	history-by-period	1st millennium BCE		The world from 1000 to 1 BCE.				-999/0
+period-1-1000	history-by-period	1st millennium CE		The world from 1 to 1000 CE.				1/1000
+period-1001-1500	history-by-period	11th to 15th centuries		The world from 1001 to 1500 CE.				1001/1500
+period-1501-1800	history-by-period	16th to 18th centuries		The world from 1501 to 1800 CE.				1501/1800
+period-1801-1900	history-by-period	19th century		The world from 1801 to 1900 CE.				1801/1900
+period-1901-2000	history-by-period	20th century		The world from 1901 to 2000 CE.				1901/2000
+period-2001-present	history-by-period	21st century		The world from 2001 CE to the present.				2001/..
+history-by-region	past	History by region		History of each world region, following the UN M49 regional divisions, plus the oceans that connect them.	political-geography
+history-of-africa	history-by-region	History of Africa		The history of the African continent and its peoples.		space/m49-002
+history-of-northern-africa	history-of-africa	History of Northern Africa		History of the region from the Nile valley to the Maghreb.		space/m49-015
+history-of-western-africa	history-of-africa	History of Western Africa		History of the region from the Sahel to the Gulf of Guinea.		space/m49-011
+history-of-eastern-africa	history-of-africa	History of Eastern Africa		History of the region from the Horn of Africa to the Swahili coast and the Indian Ocean islands.		space/m49-014
+history-of-middle-africa	history-of-africa	History of Central Africa	Middle Africa	History of the Congo basin and neighbouring lands (M49: Middle Africa).		space/m49-017
+history-of-southern-africa	history-of-africa	History of Southern Africa		History of the southern end of the African continent.		space/m49-018
+history-of-the-americas	history-by-region	History of the Americas		The history of North, Central and South America and the Caribbean.		space/m49-019
+history-of-northern-america	history-of-the-americas	History of Northern America		History of the northern part of the Americas (M49: Northern America).		space/m49-021
+history-of-central-america	history-of-the-americas	History of Central America		History of the isthmus from Mexico to Panama (M49: Central America).		space/m49-013
+history-of-the-caribbean	history-of-the-americas	History of the Caribbean		History of the Caribbean islands and their peoples.		space/m49-029
+history-of-south-america	history-of-the-americas	History of South America		History of the South American continent.		space/m49-005
+history-of-asia	history-by-region	History of Asia		The history of the Asian continent and its peoples.		space/m49-142
+history-of-central-asia	history-of-asia	History of Central Asia		History of the steppe and oasis lands of Central Asia.		space/m49-143
+history-of-eastern-asia	history-of-asia	History of Eastern Asia		History of the region including China, Japan, Korea and Mongolia.		space/m49-030
+history-of-south-eastern-asia	history-of-asia	History of South-eastern Asia		History of mainland and maritime Southeast Asia.		space/m49-035
+history-of-southern-asia	history-of-asia	History of Southern Asia		History of the Indian subcontinent, Iran and neighbouring lands (M49: Southern Asia).		space/m49-034
+history-of-western-asia	history-of-asia	History of Western Asia		History of the region from Anatolia and the Caucasus to Arabia and Mesopotamia.		space/m49-145
+history-of-europe	history-by-region	History of Europe		The history of the European continent and its peoples.		space/m49-150
+history-of-eastern-europe	history-of-europe	History of Eastern Europe		History of the eastern part of Europe (M49: Eastern Europe).		space/m49-151
+history-of-northern-europe	history-of-europe	History of Northern Europe		History of the northern part of Europe (M49: Northern Europe).		space/m49-154
+history-of-southern-europe	history-of-europe	History of Southern Europe		History of the southern part of Europe (M49: Southern Europe).		space/m49-039
+history-of-western-europe	history-of-europe	History of Western Europe		History of the western part of Europe (M49: Western Europe).		space/m49-155
+history-of-oceania	history-by-region	History of Oceania		The history of Australia, New Zealand and the Pacific Islands.		space/m49-009
+history-of-australia-and-new-zealand	history-of-oceania	History of Australia and New Zealand		History of Australia and Aotearoa New Zealand, including the tens of thousands of years of Aboriginal and Torres Strait Islander history and the history of Māori.		space/m49-053
+history-of-melanesia	history-of-oceania	History of Melanesia		History of New Guinea and the islands of Melanesia.		space/m49-054
+history-of-micronesia	history-of-oceania	History of Micronesia		History of the islands of Micronesia.		space/m49-057
+history-of-polynesia	history-of-oceania	History of Polynesia		History of the islands of Polynesia.		space/m49-061
+history-of-antarctica	history-by-region	History of Antarctica		The history of Antarctica: its sighting, exploration, science and governance.		space/m49-010
+history-of-the-oceans	history-by-region	Maritime and oceanic history	maritime history	The history of the seas and oceans and of the people who crossed, fished and traded on them.	trade-networks|water-transport
+thematic-history	past	History by theme		History of particular aspects of human life across regions and periods.
+economic-history	thematic-history	Economic history		The history of economies, work, money and trade.	economics
+social-history	thematic-history	Social history		The history of everyday life, families, communities and social groups.	sociology
+political-history	thematic-history	Political history		The history of states, governments and political movements.	politics
+military-history	thematic-history	Military history		The history of war and armed forces.	conflict-and-peace
+environmental-history	thematic-history	Environmental history		The history of the relationship between people and the rest of nature.	climate-change
+history-of-science-and-technology	thematic-history	History of science and technology		How knowledge of nature and the tools of making developed in every civilization.	science|technology
+intellectual-history	thematic-history	Intellectual history	history of ideas	The history of ideas and of the people who held them.	philosophy
+womens-and-gender-history	thematic-history	Women's and gender history		The history of women and of gender relations.	gender
+history-of-religions	thematic-history	History of religions		How religious traditions arose, spread and changed.	religious-traditions
+global-and-connected-history	thematic-history	Global and connected history	world history	History across boundaries: exchanges, networks and processes that linked regions.
+trade-networks	global-and-connected-history	Trade networks	Silk Roads|Indian Ocean trade	Long-distance networks of exchange, such as the Silk Roads, the Indian Ocean routes, the trans-Saharan routes and the Atlantic system.	trade
+empires	global-and-connected-history	Empires	imperialism	Empires across the world and across time — among them the Achaemenid, Roman, Han, Maurya, Abbasid, Mali, Mongol, Ottoman, Inca, Mughal, Qing and British empires — compared as a form of rule.
+colonialism-and-decolonization	global-and-connected-history	Colonialism and decolonization	colonialism|decolonization	Colonial rule and settlement, resistance to it, and the independence of colonized peoples.	indigenous-peoples
+slavery-and-forced-labour	global-and-connected-history	Slavery and forced labour	slavery	Slavery and other forms of unfree labour across history, including the ancient, trans-Saharan, Indian Ocean and transatlantic slave trades.	human-rights
+revolutions-and-independence	global-and-connected-history	Revolutions and independence movements	revolutions	Revolutions and movements for independence and self-rule.	social-movements
+archaeology	past	Archaeology		The study of the human past through material remains.	prehistory
+archaeological-methods	archaeology	Archaeological methods	radiocarbon dating|excavation	Survey, excavation and scientific dating and analysis of remains.	geochronology
+cultural-heritage	archaeology	Cultural heritage	heritage	Sites, objects and practices valued as heritage, their protection, and debates over ownership and return.	museums
+historiography	past	Historiography and historical method	historiography	How history is researched and written, and the history of that writing.
+historical-method	historiography	Historical method	source criticism	Finding, criticizing and interpreting sources.	archives
+oral-history	historiography	Oral history		History gathered from spoken memories and testimony.	oral-tradition
+chronology	historiography	Chronology and dating		Ordering events in time and reconciling calendars and eras.	calendars-and-timekeeping|geochronology
+collective-memory	historiography	Collective memory and commemoration	public memory|memorials	How communities remember and commemorate the past, and conflicts over memory.	memory
+biography	historiography|literature	Biography and life writing		Accounts of individual lives.	essays-and-nonfiction
+genealogy	historiography	Genealogy and family history		Tracing descent and family history.	family-and-kinship
+auxiliary-sciences-of-history	past	Auxiliary sciences of history		Specialized disciplines that date, read and authenticate historical sources.
+numismatics	auxiliary-sciences-of-history	Numismatics	coins	The study of coins, currency and medals.	money-and-finance
+epigraphy	auxiliary-sciences-of-history	Epigraphy	inscriptions	The study of inscriptions.	writing-systems
+palaeography	auxiliary-sciences-of-history	Palaeography	old handwriting	The study of historical handwriting and manuscripts.	calligraphy
+heraldry	auxiliary-sciences-of-history	Heraldry and vexillology	coats of arms|flags	Coats of arms, seals, flags and other emblems.

@@ -1,0 +1,25 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+entity		Anything		Anything that exists, happened, or can be referred to. The single top of the kind facet.
+continuant	entity	Thing that persists		Something that persists through time while keeping its identity (an object, a place, a group).
+physical-object	continuant	Physical object	material object	A bounded material thing: a rock, a river, a planet, a chair.
+substance	continuant	Substance or material	stuff|material	A kind of stuff rather than a bounded thing: water, iron, basalt, DNA.
+organism	physical-object	Living organism	living thing	An individual living being of any kind.
+person	organism	Person	human being|individual	An individual human being, living or dead, real (fictional persons are 'character').
+artifact	physical-object	Artifact	made object	A physical thing made or modified by people: a tool, a building, a manuscript, a machine.
+place	continuant	Place	location	A location: a settlement, a region, a natural feature, a site, a place in space.
+group	continuant	Group or organization	collective|organization	A collective of people or organisms that acts or is treated as a unit: a family, a people, a company, a state, a species population.
+occurrent	entity	Thing that happens		Something that unfolds in time: it has parts that happen at different times.
+event	occurrent	Event	happening	A bounded happening: a battle, an eruption, a festival held on a date, a discovery.
+process	occurrent	Process	change	A change that proceeds or recurs: erosion, photosynthesis, urbanization, language change.
+practice	occurrent	Practice or activity	activity|custom|skill	Something people habitually do: a craft, a ritual, a sport, a method, a way of farming.
+abstract	entity	Abstract thing		Something not located in space and time: a number, an idea, a property.
+idea	abstract	Idea, concept or theory	concept|theory	A thought-content: a concept, a hypothesis, a theory, a doctrine.
+quality	abstract	Quality or quantity	property|attribute	A property of something or a measurable magnitude: mass, colour, temperature, population.
+mathematical-object	abstract	Mathematical object		A number, set, function, structure or proof.
+work	entity	Work or expression	creative work|expression	A made expression of meaning: a text, an artwork, a piece of music, a film, software, a dataset.
+norm	abstract	Norm or institution	rule|law|custom	A shared rule or institution: a law, a right, a convention, a custom, a standard.
+symbol-system	abstract	Symbol system	notation	A system of signs: a language, a script, a notation, a code.
+time-period	abstract	Time period	era|period	A span of time treated as a unit: a century, a dynasty's reign, a geological period.
+field	abstract	Field of knowledge	discipline|field of study	An organized area of study or knowledge, such as a science, a craft tradition's body of knowledge, or a branch of scholarship.
+tradition	abstract	Tradition or worldview	belief system|worldview	A body of beliefs, practices and teachings held by a community: a religion, a philosophy, an ideology.
+character	abstract	Fictional or legendary character	legendary being	A being that exists within a narrative, myth or tradition (as distinct from a person).

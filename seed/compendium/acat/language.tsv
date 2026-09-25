@@ -1,0 +1,56 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+language		Language & Communication	language|communication	Human languages — their structure, history and writing systems — and the media through which people communicate.	society|arts|thought
+linguistics	language	Linguistics		The scientific study of language.
+phonetics-and-phonology	linguistics	Phonetics and phonology	speech sounds	Speech sounds and the sound systems of languages, including the handshapes and movements of sign languages.
+grammar	linguistics	Grammar	morphology|syntax	How words are formed and combined into sentences.
+semantics-and-pragmatics	linguistics	Semantics and pragmatics	meaning	Meaning in language, and how context shapes it.	philosophy-of-language
+historical-linguistics	linguistics	Historical linguistics	language change	How languages change over time and how their relationships are reconstructed.	languages-of-the-world
+sociolinguistics	linguistics	Sociolinguistics	language policy|multilingualism	Language in society: dialects, multilingualism, language policy and language and identity.
+psycholinguistics	linguistics|mind	Psycholinguistics	language acquisition	How language is learned, produced and understood.
+computational-linguistics	linguistics|computing	Computational linguistics	natural language processing	Computational models of language and language technology.	artificial-intelligence
+language-documentation	linguistics	Language documentation and endangerment	endangered languages	Recording and revitalizing languages, many of which are endangered.	indigenous-peoples
+onomastics	linguistics	Names and naming	onomastics|toponymy	Personal names, place names and naming practices across cultures.	birth-and-naming-customs
+lexicography	linguistics	Lexicography	dictionaries	Compiling and studying dictionaries.	reference-works
+languages-of-the-world	language	Languages of the world	language families	The world's roughly seven thousand languages, grouped by family where relationships are established; regional groupings are marked as such.
+afroasiatic-languages	languages-of-the-world	Afroasiatic languages		Language family of North Africa, the Horn of Africa and West Asia, including Arabic, Amharic, Hausa, Hebrew, Somali and Berber languages.		space/m49-002|space/m49-145
+austroasiatic-languages	languages-of-the-world	Austroasiatic languages		Language family of mainland Southeast Asia and parts of South Asia, including Vietnamese, Khmer and Santali.		space/m49-035|space/m49-034
+austronesian-languages	languages-of-the-world	Austronesian languages		Language family spread from Madagascar to Rapa Nui, including Malay-Indonesian, Tagalog, Malagasy, Māori and Hawaiian.		space/m49-035|space/m49-009
+dravidian-languages	languages-of-the-world	Dravidian languages		Language family of southern India and Sri Lanka, including Tamil, Telugu, Kannada and Malayalam.		space/m49-034
+indo-european-languages	languages-of-the-world	Indo-European languages		Language family of Europe, Iran and much of South Asia, including Hindi-Urdu, Bengali, Persian, Russian, Spanish, English and Greek.		space/m49-150|space/m49-034
+japonic-languages	languages-of-the-world	Japonic languages		Japanese and the Ryukyuan languages.		space/m49-030
+koreanic-languages	languages-of-the-world	Koreanic languages		Korean and the Jeju language.		space/m49-030
+kra-dai-languages	languages-of-the-world	Kra–Dai languages	Tai–Kadai languages	Language family of mainland Southeast Asia and southern China, including Thai and Lao.		space/m49-035|space/m49-030
+mongolic-languages	languages-of-the-world	Mongolic languages		Mongolian and related languages of Central and East Asia.		space/m49-030|space/m49-143
+niger-congo-languages	languages-of-the-world	Niger–Congo languages	Atlantic–Congo languages	The largest language family by number of languages, spread across sub-Saharan Africa, including Yoruba, Igbo, Swahili, Zulu and Wolof; the extent of the family is debated.		space/m49-202
+nilo-saharan-languages	languages-of-the-world	Nilo-Saharan languages		A proposed family of African languages, including Kanuri, Luo, Maasai and Songhay; its unity is debated among linguists.		space/m49-002
+sino-tibetan-languages	languages-of-the-world	Sino-Tibetan languages		Language family including the Chinese languages, Tibetan, Burmese and many languages of the Himalayas.		space/m49-030|space/m49-034|space/m49-035
+trans-new-guinea-languages	languages-of-the-world	Trans–New Guinea languages		The largest of the language families of New Guinea and nearby islands.		space/m49-054
+tungusic-languages	languages-of-the-world	Tungusic languages		Languages of Siberia and northeast China, including Evenki and Manchu.		space/m49-030|space/m49-151
+turkic-languages	languages-of-the-world	Turkic languages		Language family stretching from southeastern Europe to Siberia, including Turkish, Azerbaijani, Uzbek, Kazakh, Uyghur and Tatar.	mongolic-languages	space/m49-143|space/m49-145
+uralic-languages	languages-of-the-world	Uralic languages		Language family including Finnish, Estonian, Hungarian and the Sami and Samoyedic languages.		space/m49-151|space/m49-154
+caucasian-languages	languages-of-the-world	Languages of the Caucasus (regional grouping)		The Kartvelian, Northwest Caucasian and Northeast Caucasian families, grouped here by region rather than by descent.		space/m49-145|space/m49-151
+khoisan-languages	languages-of-the-world	Khoisan languages (regional grouping)	click languages	Click languages of southern and eastern Africa belonging to several families, grouped here by region rather than by descent.		space/m49-018|space/m49-014
+australian-aboriginal-languages	languages-of-the-world	Aboriginal Australian languages (regional grouping)		The Pama–Nyungan family and several other families of Aboriginal Australia, grouped here by region.	indigenous-peoples	space/m49-053
+indigenous-languages-of-the-americas	languages-of-the-world	Indigenous languages of the Americas (regional grouping)		Many families and isolates, among them Quechuan, Mayan, Uto-Aztecan, Tupian, Arawakan and Algonquian, grouped here by region rather than by descent.	indigenous-peoples	space/m49-019
+language-isolates	languages-of-the-world	Language isolates		Languages with no demonstrated relatives, such as Basque, Ainu and Burushaski.
+sign-languages	languages-of-the-world	Sign languages		Languages of the hands, face and body, used by Deaf communities worldwide.	disability
+pidgins-and-creoles	languages-of-the-world	Pidgins and creoles		Languages that arose from contact between speakers of different languages.	trade-networks|colonialism-and-decolonization
+constructed-languages	languages-of-the-world	Constructed languages	planned languages	Languages deliberately designed, such as Esperanto.
+writing-systems	language	Writing systems and scripts	scripts|orthography	The systems people use to write languages, classified by how their signs map to language.	literacy|calligraphy
+alphabets	writing-systems	Alphabets		Scripts with separate letters for consonants and vowels, such as Latin, Greek, Cyrillic, Georgian and Hangul.
+abjads	writing-systems	Abjads	consonantal scripts	Scripts that write mainly consonants, such as Arabic, Hebrew and Syriac.
+abugidas	writing-systems	Abugidas	alphasyllabaries	Scripts in which vowels are marked on consonant letters, such as Devanagari, Tamil, Thai and Ge'ez.
+syllabaries	writing-systems	Syllabaries		Scripts with signs for whole syllables, such as Japanese kana, Cherokee and Vai.
+logographic-writing	writing-systems	Logographic writing	logograms	Writing in which signs stand for words or morphemes, as in Chinese characters, Egyptian hieroglyphs and Maya script.
+communication	language	Communication and media	media|mass media	How people exchange information and meaning, and the media that carry it.
+journalism	communication	Journalism and news	news|press	Gathering, verifying and reporting news.
+broadcasting	communication	Radio and television	broadcasting	Radio and television, their technologies, institutions and programmes.	telecommunications
+social-media	communication|internet	Social media	online communication	Online platforms for sharing and discussion, and their social effects.
+advertising-and-public-relations	communication	Advertising and public relations	marketing	Persuasive communication on behalf of products, organizations and causes.	business-and-management
+propaganda	communication	Propaganda and persuasion	disinformation	Communication designed to shape opinion, including disinformation, and how it is studied and countered.	political-ideologies
+rhetoric	communication	Rhetoric	oratory|public speaking	The art and study of persuasive speech and writing.	argumentation
+nonverbal-communication	communication	Nonverbal communication	gesture|body language	Gesture, facial expression, posture and other communication without words.
+translation-and-interpreting	communication	Translation and interpreting	translation	Carrying meaning between languages in writing and speech.
+oral-tradition	communication	Oral tradition	storytelling	Knowledge, history and art passed on by word of mouth across generations.	epic-and-oral-literature|oral-history
+publishing	communication	Books and publishing	books	Producing and distributing books and other publications.	printing|libraries
+semiotics	communication	Semiotics	signs and symbols	Signs, symbols and how they produce meaning.	philosophy-of-language

@@ -1,0 +1,23 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+lcc		Library of Congress Classification	LCC	Classification of the U.S. Library of Congress, developed from 1897. Class captions checked against the Library of Congress Classification Outline page (loc.gov).
+A	lcc	General works	GENERAL WORKS				A
+B	lcc	Philosophy. Psychology. Religion	PHILOSOPHY. PSYCHOLOGY. RELIGION				B
+C	lcc	Auxiliary sciences of history	AUXILIARY SCIENCES OF HISTORY				C
+D	lcc	World history and history of Europe, Asia, Africa, Australia, New Zealand, etc.	WORLD HISTORY AND HISTORY OF EUROPE, ASIA, AFRICA, AUSTRALIA, NEW ZEALAND, ETC.	One class for the history of the world outside the Americas, while the Americas have two (E and F). Kept as a documented example of a scheme's centre of gravity.			D
+E	lcc	History of the Americas (E)	HISTORY OF THE AMERICAS				E
+F	lcc	History of the Americas (F)	HISTORY OF THE AMERICAS				F
+G	lcc	Geography. Anthropology. Recreation	GEOGRAPHY. ANTHROPOLOGY. RECREATION				G
+H	lcc	Social sciences	SOCIAL SCIENCES				H
+J	lcc	Political science	POLITICAL SCIENCE				J
+K	lcc	Law	LAW				K
+L	lcc	Education	EDUCATION				L
+M	lcc	Music and books on music	MUSIC AND BOOKS ON MUSIC				M
+N	lcc	Fine arts	FINE ARTS				N
+P	lcc	Language and literature	LANGUAGE AND LITERATURE				P
+Q	lcc	Science	SCIENCE				Q
+R	lcc	Medicine	MEDICINE				R
+S	lcc	Agriculture	AGRICULTURE				S
+T	lcc	Technology	TECHNOLOGY				T
+U	lcc	Military science	MILITARY SCIENCE				U
+V	lcc	Naval science	NAVAL SCIENCE				V
+Z	lcc	Bibliography. Library science. Information resources (general)	BIBLIOGRAPHY. LIBRARY SCIENCE. INFORMATION RESOURCES (GENERAL)				Z

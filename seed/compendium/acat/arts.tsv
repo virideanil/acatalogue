@@ -1,0 +1,46 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+arts		Arts & Expression	the arts	Creative expression and its traditions: literature, music, visual arts, performance, film, architecture and design.	language|everyday|belief
+literature	arts	Literature		Verbal art, written and oral, in every language.	languages-of-the-world
+poetry	literature	Poetry		Verse in its many forms and traditions.
+prose-fiction	literature	Prose fiction	novels|short stories	Novels, short stories and other narrative prose.
+epic-and-oral-literature	literature|oral-tradition	Epic and oral literature	epics	Epics and other long narrative works, often first composed and performed orally, such as the Epic of Gilgamesh, the Mahabharata, the Epic of Sundiata, the Popol Vuh and the Book of Dede Korkut.	mythology-and-folklore
+essays-and-nonfiction	literature	Essays and literary nonfiction	essays|memoir	Essays, memoirs, travel writing and other literary nonfiction.	biography
+childrens-literature	literature	Children's literature		Literature written or told for children.	childhood
+comics-and-graphic-narrative	literature|visual-arts	Comics and graphic narrative	comics|manga|graphic novels	Stories told in sequences of images and words: comics, manga, bandes dessinées, graphic novels.
+literary-theory	literature	Literary theory and criticism	literary criticism	Ways of reading, interpreting and evaluating literature.	aesthetics
+music	arts	Music		Organized sound in all its traditions and uses.	acoustics
+music-theory	music	Music theory and composition		How music is structured and made: pitch, rhythm, harmony, form, and the theories of different traditions.	mathematics
+musical-instruments	music	Musical instruments	organology	Instruments of every tradition and how they produce sound.	acoustics
+art-music-traditions	music	Art music traditions	classical music	Learned, formally transmitted music traditions set side by side — among them Arabic maqam, Carnatic, Chinese, gamelan, Hindustani, Japanese, Persian and European classical music.
+folk-and-traditional-music	music	Folk and traditional music		Music passed on within communities, often orally.	oral-tradition
+popular-music	music	Popular music	pop music	Commercially spread music genres, such as jazz, rock, hip hop, reggae, Afrobeats, K-pop and electronic dance music.	broadcasting
+sacred-music	music	Sacred and devotional music	religious music	Music of worship and devotion across traditions.	ritual-and-worship
+ethnomusicology	music	Ethnomusicology		Music studied in its social and cultural context.	cultural-anthropology
+visual-arts	arts	Visual arts		Art made primarily to be seen.
+painting	visual-arts	Painting		Painting in its media and traditions.
+drawing-and-printmaking	visual-arts	Drawing and printmaking	prints|woodblock printing	Drawing, and the making of images from blocks, plates and screens.	printing
+sculpture	visual-arts	Sculpture		Three-dimensional art in stone, wood, metal, clay and other materials.
+photography	visual-arts	Photography		Making images with light-sensitive materials and sensors, as art, record and communication.	optics
+calligraphy	visual-arts|writing-systems	Calligraphy		The art of beautiful writing, in scripts such as Arabic, Chinese, Latin, Devanagari and Ottoman Turkish.
+textile-arts	visual-arts	Textile arts	weaving|embroidery	Weaving, embroidery, knotting, dyeing, quilting and other arts of fibre and cloth.	textile-production|traditional-dress
+ceramics	visual-arts	Ceramics and pottery	pottery	Objects of fired clay, useful and decorative.	crafts-and-trades
+decorative-arts	visual-arts	Decorative arts and crafts	applied arts	Art in useful objects: metalwork, woodwork, glass, lacquer, jewellery, furniture.	crafts-and-trades
+rock-art	visual-arts|prehistory	Rock art	cave art|petroglyphs	Images painted, drawn or carved on rock, from the Palaeolithic to the present, found on every inhabited continent.
+art-history	visual-arts	Art history and criticism		The history and interpretation of art.	thematic-history
+performing-arts	arts	Performing arts		Arts presented live by performers.
+theatre	performing-arts	Theatre and drama	drama	Drama performed live, in forms such as Sanskrit drama, Noh and Kabuki, Peking opera, European theatre and contemporary theatre.
+dance	performing-arts	Dance		Dance in its social, ritual and artistic forms.
+puppetry	performing-arts	Puppetry	shadow play	Theatre with puppets, including shadow theatres such as wayang kulit and Karagöz.
+opera-and-music-theatre	performing-arts	Opera and music theatre	opera|musicals	Staged drama carried by music.	art-music-traditions
+film	arts	Film and moving image	cinema|movies	Cinema, animation and other moving-image arts.	broadcasting
+animation	film	Animation		Moving images made from drawings, models or computer graphics.
+documentary-film	film	Documentary film		Nonfiction film.
+architecture	arts	Architecture		Designing buildings and spaces, across traditions.	construction|civil-engineering
+vernacular-architecture	architecture	Vernacular architecture		Traditional building by communities using local materials and knowledge.	housing
+landscape-architecture	architecture	Gardens and landscape design	landscape architecture	Designing gardens, parks and landscapes.	gardening
+urban-planning	architecture|cities-and-settlements	Urban planning and design	urban design	Planning and designing towns and cities.
+design	arts	Design		Shaping objects, images and systems for use and meaning.
+graphic-design	design	Graphic design	typography	Visual communication with type, image and layout.	writing-systems
+industrial-design	design	Industrial design	product design	Designing manufactured products.	manufacturing
+fashion-design	design	Fashion design		Designing clothing and accessories.	clothing-and-adornment
+interaction-design	design	Interaction design	user experience	Designing how people interact with digital products and services.	software

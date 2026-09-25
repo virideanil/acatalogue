@@ -1,0 +1,52 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+thought		Thought & Knowledge	knowledge|formal sciences	Systematic reasoning and knowing: philosophy, logic, mathematics, the methods of science, other knowledge systems, and the organization of information.	belief|matter|language
+philosophy	thought	Philosophy		Fundamental questions about existence, knowledge, value, reason, mind and language, in every tradition.
+metaphysics	philosophy	Metaphysics	ontology	Being and reality: existence, causation, time, identity, possibility.
+epistemology	philosophy	Epistemology	theory of knowledge	Knowledge, belief, justification and evidence.	scientific-method
+ethics	philosophy	Ethics	moral philosophy	Right and wrong, good and bad, duty, virtue and the good life.	humanism
+applied-ethics	ethics	Applied ethics	bioethics	Ethics applied to particular fields: bioethics, environmental ethics, business ethics, the ethics of technology.	artificial-intelligence
+aesthetics	philosophy|arts	Aesthetics	philosophy of art	Beauty, taste and the nature and value of art.	literary-theory
+political-philosophy	philosophy|politics	Political philosophy		Justice, legitimacy, liberty, rights and the purposes of government.	political-ideologies
+philosophy-of-mind	philosophy|mind	Philosophy of mind		The nature of mind and consciousness and their relation to the body.	consciousness
+philosophy-of-language	philosophy|language	Philosophy of language		Meaning, reference and truth in language.	semantics-and-pragmatics
+philosophy-of-science	philosophy|science	Philosophy of science		What science is, how it explains, and what justifies its claims.
+philosophical-traditions	philosophy	Philosophical traditions		The world's philosophical traditions, listed as equal siblings in alphabetical order.
+african-philosophy	philosophical-traditions	African philosophy		Philosophy of African peoples and the African diaspora, from oral wisdom traditions to academic philosophy.		space/m49-002
+buddhist-philosophy	philosophical-traditions	Buddhist philosophy		Philosophical traditions within Buddhism: Abhidharma, Madhyamaka, Yogācāra, pramāṇa and others.	buddhism
+chinese-philosophy	philosophical-traditions	Chinese philosophy		Philosophy in China, including Confucian, Daoist, Mohist, Legalist and Neo-Confucian thought.	confucianism|taoism	space/m49-030
+indian-philosophy	philosophical-traditions	Indian philosophy	darshanas	Philosophy of the Indian subcontinent, including Nyāya, Vaiśeṣika, Sāṃkhya, Yoga, Mīmāṃsā, Vedānta, Jain and Buddhist schools and Cārvāka.	hinduism|jainism	space/m49-034
+indigenous-philosophies	philosophical-traditions	Indigenous philosophies		Philosophical thought of Indigenous peoples of the Americas, Oceania, Africa, Asia and the Arctic.	indigenous-peoples|traditional-knowledge
+islamic-philosophy	philosophical-traditions	Islamic philosophy	falsafa|kalam	Philosophy developed in the Islamic world, including falsafa and kalam, written in Arabic, Persian, Ottoman Turkish and other languages.	islam
+japanese-philosophy	philosophical-traditions	Japanese philosophy		Philosophy in Japan, from Buddhist and Confucian thought to the Kyoto School.		space/m49-030
+jewish-philosophy	philosophical-traditions	Jewish philosophy		Philosophy developed within Jewish tradition.	judaism
+latin-american-philosophy	philosophical-traditions	Latin American philosophy		Philosophy in Latin America, including the philosophy of liberation.		space/m49-419
+western-philosophy	philosophical-traditions	Western philosophy	European philosophy	The philosophical tradition that began in ancient Greece and continued in Europe and the Americas, including analytic and continental philosophy.		space/m49-150
+logic	thought|philosophy	Logic		The principles of valid reasoning, formal and informal, as developed in the Aristotelian, Indian, Chinese, Islamic and modern traditions.	mathematics
+mathematical-logic	logic|mathematics	Mathematical logic	formal logic	Formal systems, proof, computability and model theory.	computer-science|foundations-of-mathematics
+argumentation	logic	Argumentation and informal logic	critical thinking|fallacies	Arguments as used in everyday reasoning, their evaluation and their fallacies.	rhetoric
+mathematics	thought	Mathematics		Number, quantity, structure, space and change, studied through proof.	physics
+numeral-systems	mathematics	Numeral systems and counting	number systems	The ways cultures write and count numbers, such as decimal, vigesimal and sexagesimal systems and positional notation.	units-of-measurement
+number-theory	mathematics	Arithmetic and number theory	arithmetic	Numbers and their properties.	information-security
+algebra	mathematics	Algebra		Equations and abstract structures such as groups, rings and fields.
+geometry-and-topology	mathematics	Geometry and topology	geometry|topology	Shape, space and the properties preserved under continuous deformation.
+mathematical-analysis	mathematics	Mathematical analysis	calculus	Limits, change and continuous quantities: calculus and its extensions.
+probability-and-statistics	mathematics	Probability and statistics	statistics	Chance and uncertainty, and methods for learning from data.	research-methods
+discrete-mathematics	mathematics	Discrete mathematics	combinatorics|graph theory	Countable structures: combinatorics, graphs and networks.	computer-science
+applied-mathematics	mathematics	Applied mathematics	numerical analysis|operations research	Mathematical methods for science, engineering and decision-making.	engineering
+game-theory	mathematics	Game theory		Mathematical models of strategic interaction between decision-makers.	decision-making|economics
+foundations-of-mathematics	mathematics	Foundations of mathematics	set theory	Set theory, logic and the philosophy of mathematics.
+science	thought	Science and its methods		Science as a way of knowing: its methods, institutions and relation to society.
+scientific-method	science	Scientific method		Observation, hypothesis, experiment, measurement, peer review and replication.	epistemology
+research-methods	science	Research methods		Quantitative, qualitative and mixed methods for studying the natural and social world.	probability-and-statistics
+science-and-society	science	Science and society	science policy|science communication	How science is funded, governed, communicated and trusted, and its ethics.	applied-ethics
+traditional-knowledge	thought	Traditional and Indigenous knowledge	indigenous knowledge|local knowledge	Bodies of knowledge developed by communities over generations — about ecosystems, navigation, healing, farming and more — transmitted largely through practice and oral tradition.	indigenous-peoples|oral-tradition
+traditional-ecological-knowledge	traditional-knowledge	Traditional ecological knowledge		Knowledge of plants, animals, land and seasons held by communities who have long lived with them.	conservation-biology|farming-systems
+traditional-navigation	traditional-knowledge	Traditional navigation and wayfinding	wayfinding	Navigation without instruments, by stars, swells, winds and birds, as in Polynesian and Micronesian voyaging.	cultural-astronomy|water-transport
+information-science	thought	Information and knowledge organization	library and information science	Collecting, organizing, preserving and giving access to information and knowledge.	data-and-databases
+libraries	information-science	Libraries	library science	Libraries and librarianship.	publishing
+archives	information-science	Archives and records	archival science	Keeping records and archives, and the evidence they preserve.	historical-method
+museums	information-science	Museums and collections	museology	Collecting, preserving and displaying objects, and questions of who owns and returns them.	cultural-heritage
+knowledge-organization	information-science	Classification and knowledge organization	classification|taxonomies|ontologies	Schemes for classifying knowledge — library classifications, thesauri, taxonomies and ontologies — and their biases.	taxonomy-biology|data-and-databases
+reference-works	information-science	Encyclopedias and reference works	encyclopedias	Encyclopedias, dictionaries, atlases and other works of reference, and the history of efforts to gather all knowledge.	lexicography
+information-theory	information-science|mathematics	Information theory		The mathematics of information, uncertainty and communication.	telecommunications
+systems-and-complexity	thought	Systems and complexity	systems theory|cybernetics|complexity science	Systems thinking, cybernetics and the study of complex systems.

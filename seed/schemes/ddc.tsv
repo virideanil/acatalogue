@@ -1,0 +1,12 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+ddc		Dewey Decimal Classification	DDC	Library classification first published by Melvil Dewey in 1876, now maintained by OCLC. Main classes checked against Wikipedia's 'List of Dewey Decimal classes', which cites the OCLC DDC 23 summaries.
+000	ddc	Computer science, information, and general works					000
+100	ddc	Philosophy and psychology					100
+200	ddc	Religion		In DDC 23, divisions 220 to 280 (the Bible, Christianity, Christian practice, orders, theology, history and denominations) are devoted to Christianity, and 290 is 'Other religions'. Kept as a documented example of a single-tree scheme encoding one tradition's centre.			200
+300	ddc	Social sciences					300
+400	ddc	Language					400
+500	ddc	Science					500
+600	ddc	Technology					600
+700	ddc	Arts and recreation					700
+800	ddc	Literature					800
+900	ddc	History and geography					900

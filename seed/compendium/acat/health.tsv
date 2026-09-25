@@ -1,0 +1,39 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+health		Health & the Human Body	health|medicine and health	The human body, its functions and disorders, and the practices — across medical traditions — that maintain health and treat illness.	life|mind
+human-body	health	The human body	human biology	The structure and function of the human body.	physiology
+human-anatomy	human-body	Human anatomy		The structure of the human body, its organs and systems.
+human-physiology	human-body	Human physiology		How the human body works: circulation, respiration, digestion, metabolism and the other systems.	physiology
+medicine	health	Medicine	biomedicine	The diagnosis, treatment and prevention of disease as practised in modern biomedicine and its specialties.	traditional-and-complementary-medicine
+internal-medicine	medicine	Internal medicine		Diagnosis and non-surgical treatment of diseases of adults' internal organs.
+surgery	medicine	Surgery		Treatment by operating on the body.
+paediatrics	medicine	Paediatrics	pediatrics	Medical care of infants, children and adolescents.	childhood
+obstetrics-and-gynaecology	medicine	Obstetrics and gynaecology	obstetrics|gynecology	Pregnancy, childbirth and the health of the female reproductive system.	sexual-and-reproductive-health
+psychiatry	medicine|mental-health	Psychiatry		The medical diagnosis and treatment of mental disorders.	clinical-psychology
+neurology	medicine	Neurology		Disorders of the brain, spinal cord and nerves.	neuroscience
+cardiology	medicine	Cardiology		The heart and blood vessels and their diseases.
+oncology	medicine	Oncology	cancer	Cancer: its biology, diagnosis and treatment.	noncommunicable-diseases
+immunology	medicine	Immunology	immune system	The immune system in health and disease.	infectious-diseases|vaccination
+pharmacology	medicine	Pharmacology	drugs|medicines	How drugs act on the body, their development, safety and use.	biochemistry
+dentistry	medicine	Dentistry	oral health	The teeth, mouth and jaws and their care.
+geriatrics	medicine	Geriatrics		Medical care of older people.	adulthood-and-ageing
+diseases-and-disorders	health	Diseases and disorders		Conditions that impair the normal functioning of body or mind, and how they are classified.
+infectious-diseases	diseases-and-disorders	Infectious diseases	communicable diseases	Diseases caused by bacteria, viruses, fungi and parasites, and how they spread.	microorganisms|epidemiology
+noncommunicable-diseases	diseases-and-disorders	Noncommunicable diseases	chronic diseases	Long-lasting diseases not passed between people, such as cardiovascular disease, cancers, diabetes and chronic respiratory disease.	oncology|cardiology
+genetic-disorders	diseases-and-disorders	Genetic disorders		Conditions caused wholly or partly by variants in genes or chromosomes.	genetics
+injuries	diseases-and-disorders	Injuries		Physical harm from accidents, violence and other external causes.	surgery
+mental-health	health|mind	Mental health		Psychological and emotional well-being, mental disorders, and the care and support available across societies.	clinical-psychology
+public-health	health	Public health		Protecting and improving the health of whole populations.	natural-hazards|pollution
+epidemiology	public-health	Epidemiology		How diseases are distributed in populations and what determines them.	probability-and-statistics
+global-health	public-health	Global health	international health	Health as a worldwide concern: inequalities between and within countries, and cooperation to address them.	development-studies
+health-systems	public-health	Health systems and policy	health care systems	How health care is organized, financed and delivered in different countries.	public-policy
+vaccination	public-health	Vaccination and immunization	immunization	Vaccines and immunization programmes.	immunology|viruses
+water-sanitation-and-hygiene	public-health	Water, sanitation and hygiene	WASH|sanitation	Safe drinking water, sanitation and hygiene, and their effect on health.	water-resources
+nutrition	health	Nutrition	diet	Food and nutrients in relation to health, growth and disease.	food-and-drink
+sexual-and-reproductive-health	health	Sexual and reproductive health	reproductive health	Health in matters of sexuality and reproduction, including contraception, fertility and pregnancy.	human-sexuality|obstetrics-and-gynaecology
+nursing-and-care	health	Nursing and care	nursing|caregiving	Nursing and the wider work of caring for the sick, the disabled and the dependent, paid and unpaid.	household-and-care-work
+traditional-and-complementary-medicine	health	Traditional and complementary medicine	traditional medicine|alternative medicine	Medical systems and healing practices outside modern biomedicine, many of them centuries old; this category records the practices, while claims about their effects are kept as attributed statements.	medicine
+ayurveda	traditional-and-complementary-medicine	Ayurveda		The traditional medical system of the Indian subcontinent.		space/m49-034
+traditional-chinese-medicine	traditional-and-complementary-medicine	Traditional Chinese medicine	TCM	The traditional medical system of China, including herbal therapy and acupuncture.		space/m49-030
+unani-medicine	traditional-and-complementary-medicine	Unani medicine	Yunani medicine	The Greco-Arabic medical tradition practised in South and West Asia.		space/m49-034|space/m49-145
+traditional-african-medicine	traditional-and-complementary-medicine	Traditional African medicine		The healing traditions of African societies, combining herbal knowledge, diagnosis and spiritual practice.	african-traditional-religions	space/m49-002
+death-and-dying	health	Death and dying	end of life|palliative care	The biology of death, dying, and end-of-life and palliative care.	funerary-customs

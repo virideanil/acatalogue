@@ -1,0 +1,12 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+status		Epistemic status		How a statement stored in the catalogue is known. Every claim carries exactly one status, and every status other than 'attributed' must itself cite who judged it and by what rule.
+attributed	status	Attributed		A named source states it; this catalogue has not judged it. The default for everything ingested.
+corroborated	status	Corroborated		Stated by at least two independent sources, with no credible contrary source found. Assigned by an explicit, recorded rule.
+consensus	status	Expert consensus		The relevant expert community broadly agrees, as documented by an authoritative synthesis that is cited with the claim.
+contested	status	Contested	disputed	Credible sources disagree. Every position is kept, each attributed to its sources; none is marked as the answer.
+hypothesis	status	Hypothesis	speculative	Proposed and open to test, not yet well supported or refuted.
+tradition	status	Held within a tradition	doctrine|belief	A belief, teaching or narrative held by a religious, cultural or philosophical community, recorded as that community's account without adjudicating it.
+normative	status	Normative	value statement	A statement of value, duty or law ('ought'), true relative to a named normative system rather than as a description of the world.
+fiction	status	Fiction or narrative		True within a work of fiction, a myth or a game, not asserted as a fact about the world.
+superseded	status	Superseded	withdrawn|outdated	The source itself later withdrew or replaced it. Kept for the historical record.
+refuted	status	Refuted		Contradicted by strong evidence according to cited sources. Kept for the historical record; the refutation is attributed like any other claim.

@@ -1,0 +1,50 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+belief		Belief & Worldviews	religion|worldviews	Religious, spiritual and secular ways of understanding existence, meaning and value, with their practices, texts and communities. Traditions are described as their communities hold them, without ranking or adjudicating them.	thought|arts|everyday
+religion	belief	Religion	religious practice	Religion as a human phenomenon, and the practices, texts and places that traditions share.	sociology
+religious-studies	religion	Religious studies	comparative religion|study of religion	The academic study of religions, their history and social life.
+theology	religion	Theology		Systematic reflection on the divine and on doctrine, carried out within a tradition.
+ritual-and-worship	religion	Ritual, worship and prayer		Ritual acts, worship, prayer, sacrifice and offerings.	rites-of-passage
+sacred-texts	religion	Sacred texts and scriptures	scripture	Texts held sacred or authoritative, such as the Vedas, the Tanakh, the Tripiṭaka, the Bible, the Qur'an, the Avesta and the Guru Granth Sahib.
+mysticism	religion	Mysticism and contemplation	contemplative practice|meditation	Practices and experiences of direct encounter with the sacred or the absolute: contemplation, meditation, trance.	consciousness
+sacred-places-and-pilgrimage	religion	Sacred places and pilgrimage	pilgrimage	Places held sacred and journeys made to them.	travel-and-tourism
+religious-traditions	belief	Religious and spiritual traditions		The world's religious and spiritual traditions, listed as equal siblings in alphabetical order, with no 'other' category.
+african-traditional-religions	religious-traditions	African traditional religions		The indigenous religious traditions of African peoples, such as those of the Yoruba, Akan, Zulu and Dinka.		space/m49-002
+afro-diasporic-religions	religious-traditions	Afro-diasporic religions		Religions of the African diaspora in the Americas, such as Candomblé, Santería, Umbanda and Vodou.	african-traditional-religions	space/m49-019
+ancient-religions	religious-traditions	Religions of the ancient world		Religions of ancient societies, such as those of Egypt, Mesopotamia, Greece, Rome, the Norse and Mesoamerica, some of which are practised again today.
+bahai-faith	religious-traditions	Baháʼí Faith		Religion founded by Baháʼu'lláh in 19th-century Iran.
+buddhism	religious-traditions	Buddhism		Religion and philosophy based on the teachings attributed to the Buddha, with Theravada, Mahayana and Vajrayana traditions.	buddhist-philosophy
+chinese-folk-religion	religious-traditions	Chinese folk religion		The popular religious practices of Chinese communities: ancestor veneration, local deities and festivals.	confucianism|taoism	space/m49-030
+christianity	religious-traditions	Christianity		Religion centred on Jesus of Nazareth, with Catholic, Orthodox, Protestant and other traditions.
+confucianism	religious-traditions	Confucianism	Ruism	Ethical, social and ritual tradition based on the teachings of Confucius; whether it is a religion is itself debated.	chinese-philosophy
+druze-faith	religious-traditions	Druze faith		Religion that emerged in the 11th century in Egypt and the Levant.
+hinduism	religious-traditions	Hinduism	Sanatana Dharma	The diverse religious traditions of the Indian subcontinent centred on the Vedas and later texts, with Vaishnava, Shaiva, Shakta, Smarta and other traditions.	indian-philosophy
+indigenous-religions-americas	religious-traditions	Indigenous religions of the Americas		The religious traditions of the Indigenous peoples of North, Central and South America.	indigenous-peoples	space/m49-019
+indigenous-religions-oceania	religious-traditions	Indigenous religions of Oceania		The religious traditions of the peoples of Oceania, including Aboriginal Australian religions and the traditions of Melanesia, Micronesia and Polynesia.	indigenous-peoples	space/m49-009
+islam	religious-traditions	Islam		Religion centred on the Qur'an and the teachings of the Prophet Muhammad, with Sunni, Shia, Ibadi and other traditions.	islamic-philosophy
+jainism	religious-traditions	Jainism		Religion of the Indian subcontinent centred on non-violence and the teachings of the Tirthankaras.	indian-philosophy
+judaism	religious-traditions	Judaism		Religion of the Jewish people, centred on the Torah and the rabbinic tradition.	jewish-philosophy
+mandaeism	religious-traditions	Mandaeism		Gnostic religion of Mesopotamia honouring John the Baptist.
+modern-paganism	religious-traditions	Modern Paganism	Neopaganism	Contemporary religions reviving or inspired by pre-Christian traditions, such as Wicca, Heathenry and Rodnovery.	ancient-religions
+new-religious-movements	religious-traditions	New religious movements		Religious movements of recent origin, such as Cao Đài, Rastafari, Tenrikyo and Scientology.
+shamanism	religious-traditions	Shamanism		Practices in which specialists mediate with the spirit world, found in many cultures; how widely the term should be applied is debated.	tengrism
+shinto	religious-traditions	Shinto		Religion of Japan centred on kami and their shrines.		space/m49-030
+sikhism	religious-traditions	Sikhism		Religion founded by Guru Nanak in 15th-century Punjab.
+taoism	religious-traditions	Taoism	Daoism	Religious and philosophical tradition centred on the Tao.	chinese-philosophy
+tengrism	religious-traditions	Tengrism		Religion of the historical Turkic and Mongolic peoples centred on the sky deity Tengri, with present-day revivals.	turkic-languages	space/m49-143|space/m49-030
+yazidism	religious-traditions	Yazidism		Religion of the Yazidi people of northern Mesopotamia.
+zoroastrianism	religious-traditions	Zoroastrianism		Religion of ancient Iran based on the teachings of Zarathustra, practised today by Parsi and Iranian communities.
+secular-worldviews	belief	Non-religious worldviews	secular worldviews|irreligion	Worldviews without belief in deities or the supernatural, set beside the religious traditions as equals.
+atheism	secular-worldviews	Atheism		The absence of belief in, or the rejection of, the existence of deities.
+agnosticism	secular-worldviews	Agnosticism		The view that the existence of deities is unknown or unknowable.
+humanism	secular-worldviews	Humanism	secular humanism	Ethical worldview centred on human reason, agency and well-being.	ethics
+secularism	secular-worldviews	Secularism		Separation of religion from state institutions, and its varying forms.	political-systems
+spirituality	belief	Spirituality		Personal and non-institutional ways of relating to the sacred, meaning and transcendence.	mysticism
+mythology-and-folklore	belief	Mythology and folklore	myths|legends	Myths, legends and folk beliefs of the world's cultures.	epic-and-oral-literature|oral-tradition
+creation-narratives	mythology-and-folklore	Creation and origin narratives	creation myths	Accounts of the origin of the world, life and people, told in every culture.	cosmology|origin-of-life
+folklore	mythology-and-folklore	Folklore	folk tales|folk belief	Folk tales, legends, proverbs and folk beliefs.
+legendary-creatures	mythology-and-folklore	Legendary creatures	mythical beings	Creatures of myth, legend and scripture across cultures, such as dragons, Leviathan and Behemoth, the Simurgh and the Rainbow Serpent.
+divination-and-esotericism	belief	Divination and esotericism		Practices that seek hidden knowledge, and esoteric traditions, recorded as practices; claims about their effectiveness are kept as attributed statements.
+astrology	divination-and-esotericism	Astrology		Traditions that relate the positions of celestial bodies to human affairs, such as Hellenistic, Indian (jyotisha) and Chinese astrology; historically intertwined with astronomy.	cultural-astronomy
+alchemy	divination-and-esotericism	Alchemy		Traditions of transforming matter and the self, in China, India, the Islamic world and Europe; historically intertwined with chemistry.	history-of-science-and-technology
+divination-practices	divination-and-esotericism	Divination		Practices for seeking knowledge of the unknown or the future, such as Ifá, the I Ching, augury and tarot.
+esotericism	divination-and-esotericism	Esotericism and occultism	occultism|Hermeticism	Traditions of hidden or initiatory knowledge, such as Hermeticism, Kabbalah-inspired currents and Theosophy.

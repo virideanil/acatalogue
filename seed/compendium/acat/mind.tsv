@@ -1,0 +1,28 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+mind		Mind & Behaviour	mind|behaviour	Perception, thought, emotion, development and behaviour of individuals, and the study of consciousness.	health|thought|society
+psychology	mind	Psychology		The scientific study of mind and behaviour.
+cognitive-psychology	psychology	Cognitive psychology		Mental processes such as attention, memory, language, reasoning and problem-solving.	cognitive-science
+developmental-psychology	psychology	Developmental psychology		How people change psychologically across the lifespan.	human-development
+social-psychology	psychology	Social psychology		How people think about, influence and relate to one another.	sociology
+personality-psychology	psychology	Personality psychology	personality|individual differences	Personality and the ways individuals differ in thought, feeling and behaviour.
+clinical-psychology	psychology	Clinical psychology		The assessment and treatment of psychological distress and mental disorders.	mental-health|psychiatry
+cross-cultural-psychology	psychology	Cross-cultural psychology	cultural psychology	How psychological processes vary, and stay the same, across cultures — including the critique that most research samples come from a narrow range of societies.	cultural-anthropology
+neuroscience	mind|life	Neuroscience		The nervous system and brain, from molecules to behaviour.	neurology
+cognitive-neuroscience	neuroscience	Cognitive neuroscience		The brain processes underlying perception, thought and action.
+cognitive-science	mind	Cognitive science		The interdisciplinary study of mind, drawing on psychology, neuroscience, linguistics, philosophy, anthropology and computer science.	artificial-intelligence|philosophy-of-mind
+perception	mind	Perception	senses	How the senses take in the world and the mind makes sense of it.	optics|acoustics
+memory	mind	Memory		How experiences and knowledge are encoded, stored and recalled.	collective-memory
+learning	mind	Learning		How people and other animals acquire knowledge and skills.	pedagogy
+emotion	mind	Emotion	feelings|affect	Emotions and moods, their functions and their expression across cultures.
+motivation	mind	Motivation		What drives behaviour: needs, goals, rewards and values.
+intelligence	mind	Intelligence	cognitive ability	The capacity to learn, reason and solve problems, and the long-running debates over how to define and measure it.
+consciousness	mind	Consciousness	awareness	Subjective experience and awareness, as studied in philosophy, psychology and neuroscience.	philosophy-of-mind|mysticism
+sleep-and-dreams	mind	Sleep and dreams		Sleep, dreaming, and the meanings cultures give to dreams.
+decision-making	mind	Judgement and decision-making	decision-making	How people judge, choose and take risks.	microeconomics|game-theory
+creativity	mind	Creativity		The ability to produce ideas and works that are new and valuable.	arts
+human-development	mind	Human development	life course	Human growth and change from birth to old age.	developmental-psychology
+childhood	human-development	Childhood		Infancy and childhood: development, care and how childhood is understood in different societies.	paediatrics|childrens-play
+adolescence	human-development	Adolescence	youth	The transition from childhood to adulthood.	coming-of-age
+adulthood-and-ageing	human-development	Adulthood and ageing	ageing|old age	Adult life and ageing, and the place of older people in society.	geriatrics
+human-sexuality	mind	Human sexuality	sexuality	Sexual feelings, behaviour and identities, and their biological, psychological and cultural dimensions.	sexual-and-reproductive-health|sexual-orientation-and-gender-identity
+parapsychology	mind	Parapsychology	psychical research	Research into claimed psychic phenomena such as telepathy and precognition; whether the phenomena exist is contested, and they are not accepted as established by mainstream science.	divination-practices

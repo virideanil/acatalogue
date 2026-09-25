@@ -1,0 +1,42 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+earth		Earth	earth sciences|the planet	The planet as a physical system: its interior, surface, water and air, its climate, and the resources and hazards they present.	matter|life
+geology	earth	Geology		The solid Earth: rocks and minerals and the processes that form and change them over time.	planetary-science
+mineralogy	geology	Mineralogy	minerals	Minerals: their chemistry, crystal structure, properties and occurrence.	inorganic-chemistry
+petrology	geology	Petrology	rocks	Rocks — igneous, sedimentary and metamorphic — and how they form.
+plate-tectonics	geology	Plate tectonics	geodynamics	The movement of Earth's lithospheric plates and the mountains, basins, earthquakes and volcanoes it produces.	seismology|volcanology
+volcanology	geology	Volcanology	volcanoes	Volcanoes, magma and eruptions.	natural-hazards
+seismology	geology	Seismology		Earthquakes and the waves that travel through the Earth, and what they reveal about its interior.	earthquakes
+geochronology	geology	Geological time and stratigraphy	stratigraphy|geologic time scale	The layering of rocks and the methods and scales used to date Earth's 4.5-billion-year history.	palaeontology|chronology
+palaeontology	geology|evolution	Palaeontology	paleontology|fossils	The history of life as recorded in fossils.	geochronology
+geomorphology	geology|physical-geography	Geomorphology	landforms	Landforms and the processes that shape them: erosion, weathering, rivers, glaciers, wind.
+geochemistry	geology	Geochemistry		The chemical composition of the Earth and the cycles that move elements between rock, water, air and life.
+geophysics	geology	Geophysics		Physical methods and properties of the Earth: gravity, magnetism, heat flow, internal structure.	geodesy
+hydrosphere	earth	Water on Earth	hydrosphere	Earth's water in all its forms: oceans, rivers, lakes, groundwater and ice.	water-resources
+oceanography	hydrosphere	Oceanography	ocean science|marine science	The oceans: their water, currents, chemistry, floor and interaction with the atmosphere.	marine-biology|fluid-dynamics
+hydrology	hydrosphere	Hydrology	rivers|lakes|groundwater	Water on and under land: rivers, lakes, wetlands, groundwater and the water cycle.	water-resources
+glaciology	hydrosphere	Glaciology	glaciers|ice sheets	Glaciers, ice sheets, sea ice and permafrost.	climatology
+atmosphere	earth	Atmosphere and weather	atmospheric science	The air around Earth, its composition and motion, and the weather and climate it produces.
+meteorology	atmosphere	Meteorology	weather	Weather: its physical processes, observation and forecasting.	fluid-dynamics
+climatology	atmosphere	Climatology	climate	Climate — the long-term patterns of weather — and its natural and human-caused variation.	glaciology
+climate-change	climatology|environmental-science	Climate change	global warming	Long-term shifts in Earth's climate, including the warming observed since the 19th century, its causes and its effects on people and ecosystems.	sustainability|environmental-history
+physical-geography	earth	Physical geography		The spatial patterns of Earth's surface: landforms, climates, soils, water and vegetation.	human-geography
+soil-science	physical-geography	Soil science	pedology|soils	Soils: their formation, classification, fertility and role in ecosystems and farming.	crop-farming
+geoinformation	earth	Maps and geographic information	geomatics	Measuring, mapping and analysing the Earth's surface.	information-science
+cartography	geoinformation	Cartography	mapmaking|maps	The making and study of maps, across cultures and periods.	history-of-science-and-technology
+geodesy	geoinformation	Geodesy		The shape, orientation and gravity field of the Earth and the positioning of points on it.	geophysics
+remote-sensing	geoinformation	Remote sensing	earth observation	Observing the Earth from aircraft and satellites.	spaceflight
+geographic-information-systems	geoinformation	Geographic information systems	GIS	Software and methods for storing, analysing and displaying geographic data.	data-and-databases
+natural-resources	earth	Natural resources		Materials and energy drawn from the Earth, and questions of their abundance and use.	mining
+mineral-resources	natural-resources	Mineral resources	ores	Metallic ores, industrial minerals and building materials found in the Earth's crust.	mining|metallurgy
+energy-resources	natural-resources	Energy resources		Fossil fuels, uranium, and the flows of sun, wind, water and heat from which energy is obtained.	energy-technology
+water-resources	natural-resources	Water resources		Fresh water available for drinking, farming and industry, and how it is shared and managed.	hydrology|water-sanitation-and-hygiene
+natural-hazards	earth	Natural hazards and disasters		Natural events that endanger people and property, and how societies assess and reduce the risk.	public-health
+earthquakes	natural-hazards	Earthquakes		Earthquakes as hazards: their impacts, risk and preparedness.	seismology
+floods	natural-hazards	Floods		Flooding from rivers, rain, storm surges and snowmelt.	hydrology
+droughts	natural-hazards	Droughts		Prolonged shortages of water and their effects on land, farming and people.	climatology
+tropical-cyclones	natural-hazards	Tropical cyclones	hurricanes|typhoons	Tropical cyclones, known regionally as hurricanes, typhoons or cyclones.	meteorology
+wildfires	natural-hazards	Wildfires	bushfires	Uncontrolled fires in vegetation.	ecosystems
+tsunamis	natural-hazards	Tsunamis		Series of large ocean waves caused by earthquakes, landslides or eruptions.	seismology|oceanography
+environmental-science	earth	Environmental science		How the physical, chemical and biological parts of the environment interact, and how human activity changes them.	ecology
+pollution	environmental-science	Pollution		Harmful substances or energy released into air, water and soil, and their effects.	public-health
+sustainability	environmental-science	Sustainability		Meeting present needs without undermining the ability of future generations to meet theirs; its environmental, economic and social dimensions.	development-studies|conservation-biology

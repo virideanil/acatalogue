@@ -1,0 +1,61 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+society		Society	social sciences	How people organize collective life: groups and identities, economies, power and government, law, education and social change.	mind|everyday|past
+sociology	society	Sociology		Social relations, institutions and change.	social-psychology
+anthropology	society	Anthropology		The study of human beings across cultures, societies and time.	archaeology
+cultural-anthropology	anthropology	Social and cultural anthropology	ethnography|ethnology	Ways of life, beliefs and social organization studied through long-term fieldwork.	cross-cultural-psychology
+biological-anthropology	anthropology	Biological anthropology	physical anthropology	Human biological variation, evolution and adaptation.	human-evolution
+linguistic-anthropology	anthropology|linguistics	Linguistic anthropology		Language as social and cultural practice.	sociolinguistics
+social-groups	society	Social groups and identities		The groups people belong to and the identities they hold or are assigned.
+family-and-kinship	social-groups	Family and kinship		Family forms and kinship systems across societies.	marriage-and-partnership
+ethnicity	social-groups	Ethnicity	ethnic groups	Groups defined by shared ancestry, culture or language, and how such boundaries are drawn.
+indigenous-peoples	social-groups	Indigenous peoples		Peoples with ancestral ties to lands later colonized or incorporated into states, and their rights, self-determination and knowledge.	traditional-knowledge|colonialism-and-decolonization
+gender	social-groups	Gender	gender roles	Social roles, identities and relations associated with sex and gender across societies.	womens-and-gender-history
+sexual-orientation-and-gender-identity	social-groups	Sexual orientation and gender identity	LGBTQ|sexual minorities	Sexual orientations and gender identities, and the social and legal status of sexual and gender minorities.	human-sexuality
+disability	social-groups	Disability		Disability understood through both medical and social models, and the rights and inclusion of disabled people.	nursing-and-care
+migration-and-diaspora	social-groups	Migration and diaspora	migration|diaspora|refugees	Movement of people within and between countries, including refugees, and the communities formed abroad.	early-human-dispersals
+discrimination-and-equality	social-groups	Discrimination and equality	prejudice|racism|equality	Unequal treatment on grounds of group membership, and efforts toward equal rights and treatment.	human-rights
+social-stratification	society	Social stratification	class|caste|status	Hierarchies of class, caste and status, and how people move within them.
+poverty	social-stratification	Poverty		Lack of the resources needed for an adequate life, how it is measured, and how it is reduced.	development-studies
+population	society	Population and demography	demography	The size, structure and change of human populations: births, deaths, ageing and migration.	epidemiology
+human-geography	society	Human geography		The spatial organization of human activity: settlements, land use, borders and landscapes.	physical-geography
+cities-and-settlements	human-geography	Cities and settlements	urbanization|villages|urban studies	Villages, towns and cities, urbanization, and rural life.	urban-planning
+political-geography	human-geography	Political geography	borders|territory	Territories, borders and the geography of power.	international-relations
+economics	society	Economics and the economy	economy	How societies produce, distribute and consume goods and services.
+microeconomics	economics	Microeconomics		Choices of households and firms, and how markets set prices.	decision-making
+macroeconomics	economics	Macroeconomics		Whole economies: output, growth, employment, inflation and policy.
+economic-systems	economics	Economic systems		Ways of organizing economic life: market, planned, mixed, subsistence and gift economies, among others.	political-ideologies
+economic-thought	economics	Schools of economic thought	history of economic thought	Rival schools of economic thought — including classical, Marxian, neoclassical, Keynesian, Austrian, institutional, feminist and ecological — set side by side.
+money-and-finance	economics	Money and finance	banking	Money, banking, credit, investment and financial markets.
+trade	economics	Trade and commerce	commerce	Exchange of goods and services within and between countries.	trade-networks
+labour-and-work	economics	Labour and work	employment|work	Work, employment, labour relations and the organization of labour.	household-and-care-work
+business-and-management	economics	Business and management	companies|organizations	Enterprises and organizations, and how they are run.
+informal-economy	economics	Informal economy		Economic activity outside formal regulation and statistics, where a large share of the world's workers earn their living.	poverty
+development-economics	economics	Development economics		Economic growth and structural change in lower-income countries.	development-studies
+development-studies	society	Development studies	international development	How living conditions change and are improved, including critiques of 'development' as a concept.	sustainability|global-health
+politics	society	Politics and government	government	Power, authority and collective decision-making.
+political-systems	politics	Political systems	forms of government	Forms of government and rule — democracies, monarchies, one-party and military regimes, federations, and customary and traditional authorities — described side by side.
+political-ideologies	politics	Political ideologies		Systems of political ideas — among them anarchism, conservatism, environmentalism, feminism, liberalism, nationalism, socialism and religious political thought — set side by side.	political-philosophy
+public-policy	politics	Public policy and administration	public administration	How governments make and carry out policy.
+social-welfare	public-policy	Social welfare and social policy	welfare state|social security	Public and community provision for income, health, housing and care.	poverty
+elections-and-participation	politics	Elections and participation	voting	Voting, elections and other ways people take part in politics.
+international-relations	politics	International relations	diplomacy	Relations among states and other actors across borders.	political-geography
+international-organizations	international-relations	International organizations		Organizations of states and across borders, global and regional.
+conflict-and-peace	politics	Conflict and peace	war|peace studies	The causes, conduct and resolution of armed conflict, and the building of peace.	military-history|military-technology
+human-rights	politics|law	Human rights		Rights held by every person, their history, law and practice.	discrimination-and-equality
+social-movements	politics	Social movements	activism	Collective efforts to bring about or resist social and political change.	revolutions-and-independence
+law	society	Law and justice	legal studies	Systems of rules, how they are made and applied, and the pursuit of justice.
+legal-systems	law	Legal systems and traditions	legal traditions	The world's legal traditions, set side by side.
+civil-law-tradition	legal-systems	Civil law tradition		Legal systems built on comprehensive written codes, descended from Roman law.
+common-law-tradition	legal-systems	Common law tradition		Legal systems in which judicial decisions are a primary source of law, descended from English law.
+religious-law	legal-systems	Religious law	sharia|halakha|canon law	Legal systems grounded in religious sources, such as Islamic, Jewish, Hindu and canon law.	religion
+customary-law	legal-systems	Customary law		Law grounded in the long-standing practices of communities, recognized in many countries alongside state law.	indigenous-peoples
+constitutional-law	law	Constitutional law	constitutions	Constitutions, the structure of states and the limits of power.
+criminal-justice	law	Crime and criminal justice	criminal law|criminology	Crime, criminal law, policing, courts and punishment.
+private-law	law	Private law	civil law|contracts|property	Law between persons: contracts, property, torts, family and inheritance.
+international-law	law	International law		Law among states and international organizations, including treaties and the law of armed conflict.	international-relations
+education	society	Education		How societies teach and learn: schooling, universities, and informal and traditional education.	learning
+pedagogy	education	Pedagogy	teaching	Methods and theories of teaching.	learning
+schooling	education	Schools and schooling	primary education|secondary education	Primary and secondary schooling.
+higher-education	education	Higher education	universities	Universities, colleges and advanced study.
+literacy	education	Literacy		The ability to read and write, its spread and its social effects.	writing-systems
+informal-education	education	Informal and traditional education	apprenticeship	Learning outside schools: apprenticeship, family and community teaching, and oral transmission of knowledge.	oral-tradition|traditional-knowledge

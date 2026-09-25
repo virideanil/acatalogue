@@ -1,0 +1,40 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+everyday		Everyday Life & Leisure	daily life|leisure	The ordinary practices of living: food, clothing, home, the passages of a life, play, sport, travel and celebration.	society|arts|belief
+food-and-drink	everyday	Food and drink	food	What people eat and drink, how they prepare it, and what it means to them.	nutrition|agriculture
+cooking	food-and-drink	Cooking	cookery|culinary arts	Techniques of preparing food.
+cuisines	food-and-drink	Cuisines of the world		The cooking traditions of the world's regions and communities.
+beverages	food-and-drink	Beverages	drinks	Water, tea, coffee, fermented and distilled drinks, and the customs around them.
+dietary-customs	food-and-drink	Food customs and dietary laws	food taboos|halal|kosher	Rules and customs about what, when and with whom to eat, including religious dietary laws and vegetarian traditions.	religious-law
+clothing-and-adornment	everyday	Clothing and adornment	dress|clothing	Clothing, and the ways people adorn and modify their bodies.	textile-arts|fashion-design
+traditional-dress	clothing-and-adornment	Traditional dress		Customary clothing of communities and regions.
+body-adornment	clothing-and-adornment	Jewellery, cosmetics and body modification	jewellery|cosmetics|tattoos	Jewellery, cosmetics, hairstyles, tattooing and other body modification.	decorative-arts
+home-and-household	everyday	Home and household	home life|household	Dwellings, the work of running a household, and domestic life.
+housing	home-and-household	Housing	dwellings	Kinds of dwelling and how people obtain and share them.	vernacular-architecture
+household-and-care-work	home-and-household	Household and care work	domestic work|unpaid work	Cooking, cleaning, caring for children and relatives, and other household work, much of it unpaid.	labour-and-work|gender
+gardening	home-and-household	Gardening	horticulture	Growing plants for food, beauty and pleasure.	plants|crop-farming
+pets	home-and-household	Pets and companion animals		Animals kept for companionship.	animals
+rites-of-passage	everyday	Rites of passage and life events	life cycle rituals	The customs that mark birth, growing up, partnership and death.	ritual-and-worship
+birth-and-naming-customs	rites-of-passage	Birth and naming customs		Customs surrounding pregnancy, birth and the naming of children.	onomastics
+coming-of-age	rites-of-passage	Coming of age		Rites and customs marking the passage to adulthood.	adolescence
+marriage-and-partnership	rites-of-passage	Marriage and partnership	weddings	Forms of marriage and partnership and their ceremonies.	family-and-kinship
+funerary-customs	rites-of-passage	Funerals and mourning	funerary customs|burial	Practices surrounding death: funerals, burial, cremation, mourning and remembrance.	death-and-dying
+festivals-and-holidays	everyday	Festivals, holidays and celebrations	holidays|festivals	Religious and secular festivals, holidays and celebrations.	calendars-and-timekeeping
+calendars-and-timekeeping	everyday	Calendars and timekeeping	calendars	Calendar systems — solar, lunar and lunisolar, such as the Gregorian, Islamic, Hebrew, Chinese, Hindu and Maya calendars — and the measurement of time.	cultural-astronomy|chronology
+sport	everyday	Sport	sports	Competitive physical games and physical activity.	physical-fitness
+ball-sports	sport	Ball sports	ball games	Games played with a ball, such as association football, cricket, basketball, volleyball and hockey.
+athletics	sport	Athletics	track and field	Running, jumping, throwing and walking events.
+martial-arts-and-combat-sports	sport	Martial arts and combat sports	martial arts|wrestling	Fighting arts and combat sports, such as wrestling, boxing, judo, karate, taekwondo, capoeira and kung fu.
+water-sports	sport	Water sports	swimming|rowing	Swimming, diving, rowing, sailing, surfing and other sports on or in water.
+winter-sports	sport	Winter sports	skiing|skating	Skiing, skating and other sports on snow and ice.
+equestrian-sports	sport	Equestrian and animal sports	horse riding	Sports with horses and other animals.
+traditional-sports	sport	Traditional sports and games	folk sports	Sports rooted in particular communities, such as buzkashi, kabaddi, sepak takraw, hurling and oil wrestling.
+physical-fitness	sport	Physical fitness and exercise	exercise	Exercise and fitness for health and enjoyment.	health
+games-and-play	everyday	Games and play	games	Play and games of every kind.
+board-and-table-games	games-and-play	Board and table games	board games|card games	Board, card, dice and tile games, such as chess, go, mancala, backgammon, mahjong and dominoes.
+video-games	games-and-play	Video games	computer games	Games played on electronic devices.	software
+childrens-play	games-and-play	Children's play and toys	toys	Play, games and toys of childhood.	childhood
+games-of-chance	games-and-play	Games of chance and gambling	gambling	Games decided wholly or partly by chance, and betting on outcomes.	probability-and-statistics
+hobbies-and-recreation	everyday	Hobbies and recreation	hobbies	Pastimes people pursue for enjoyment.
+outdoor-recreation	hobbies-and-recreation	Outdoor recreation	hiking|camping	Walking, climbing, camping, recreational fishing and other time spent outdoors.
+travel-and-tourism	everyday	Travel and tourism	tourism|hospitality	Travel for leisure and the hospitality that serves it.	sacred-places-and-pilgrimage
+etiquette-and-customs	everyday	Etiquette and social customs	manners|etiquette	Manners, greetings, gift-giving, hospitality and other customs of everyday interaction.	nonverbal-communication

@@ -1,0 +1,48 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+technology		Technology & Making	technology|applied sciences	The tools, techniques and systems people use to make, grow, move, compute and build.	matter|society|everyday
+engineering	technology	Engineering		Designing and building machines, structures and systems.	physics|mathematics
+civil-engineering	engineering	Civil engineering		Roads, bridges, dams, water supply and other infrastructure.	construction
+mechanical-engineering	engineering	Mechanical engineering		Machines, engines and mechanical systems.	classical-mechanics
+electrical-engineering	engineering	Electrical and electronic engineering	electronics	Electrical systems, electronics and circuits.	electromagnetism
+chemical-engineering	engineering	Chemical engineering		Processes that transform raw materials into products at industrial scale.	chemistry
+aerospace-engineering	engineering	Aerospace engineering		Aircraft and spacecraft.	air-transport|spaceflight
+materials-science	engineering|chemistry	Materials science	materials engineering	The properties and design of materials: metals, ceramics, polymers, composites and nanomaterials.	condensed-matter-physics
+biomedical-engineering	engineering	Biomedical engineering	medical technology	Engineering applied to medicine and biology: devices, implants, imaging.	medicine
+robotics	engineering|computing	Robotics		Machines that sense, decide and act.	artificial-intelligence
+computing	technology	Computing and information technology	information technology|IT	Computers, software, networks and the processing of information.	information-science
+computer-science	computing	Computer science		Computation, algorithms and the theory of what can be computed.	mathematical-logic|discrete-mathematics
+software	computing	Software and programming	programming	Programs, programming languages and software engineering.
+computer-hardware	computing	Computer hardware		Processors, memory, storage and the architecture of computers.	electrical-engineering
+internet	computing|communication	The Internet and the Web	World Wide Web	The global network of networks and the Web built on it.	telecommunications
+artificial-intelligence	computing	Artificial intelligence	AI|machine learning	Machines that learn, reason, perceive or use language, and the debates about their effects.	cognitive-science|applied-ethics
+data-and-databases	computing	Data and databases	information retrieval	Storing, organizing, searching and analysing data.	knowledge-organization
+information-security	computing	Information security and cryptography	cybersecurity|cryptography	Protecting information and systems; the mathematics and practice of secret communication.	number-theory
+telecommunications	computing|communication	Telecommunications	networks	Transmitting information over distance: telegraph, telephone, radio, cable, fibre and satellite.	broadcasting
+energy-technology	technology	Energy technology	energy	Producing, converting, storing and distributing energy.	energy-resources
+fossil-fuel-energy	energy-technology	Fossil-fuel energy	coal|oil|natural gas	Energy from coal, oil and natural gas.	climate-change
+nuclear-energy	energy-technology	Nuclear energy	nuclear power	Electricity and heat from nuclear fission, and research toward fusion.	nuclear-physics
+renewable-energy	energy-technology	Renewable energy	solar power|wind power|hydropower	Energy from sun, wind, water, heat within the Earth and biomass.	sustainability
+electric-power	energy-technology	Electric power systems	power grids	Generating, transmitting and distributing electricity.	electrical-engineering
+energy-storage	energy-technology	Energy storage	batteries	Batteries and other ways of storing energy.	electrochemistry
+manufacturing	technology	Manufacturing and industry	industry	Making goods at scale, and the industries that do it.	industrial-design
+metallurgy	manufacturing	Metallurgy	metalworking	Extracting, refining and working metals.	mineral-resources|materials-science
+textile-production	manufacturing	Textile production	textiles	Spinning, weaving and finishing fibres into cloth.	textile-arts
+printing	manufacturing	Printing	printing press	Reproducing text and images, from woodblocks and movable type to digital printing.	publishing|drawing-and-printmaking
+crafts-and-trades	manufacturing	Crafts and trades	artisans	Skilled hand production — carpentry, smithing, pottery, leatherwork, basketry — and its knowledge.	decorative-arts|informal-education
+mining	technology	Mining and extraction	quarrying	Extracting minerals and fuels from the Earth.	mineral-resources
+agriculture	technology	Agriculture and food production	farming	Growing crops, raising animals and producing food.	food-and-drink
+crop-farming	agriculture	Crop farming	crops	Cultivating crops for food, fibre and fuel.	plants|soil-science
+pastoralism-and-livestock	agriculture	Pastoralism and livestock	animal husbandry|herding	Raising animals, including nomadic and transhumant pastoralism.	animals
+fisheries-and-aquaculture	agriculture	Fisheries and aquaculture	fishing	Catching and farming fish and other aquatic life.	marine-biology
+forestry	agriculture	Forestry		Managing forests for wood and other uses.	plants
+farming-systems	agriculture	Farming systems		Ways of farming — subsistence and commercial, irrigated and rain-fed, shifting cultivation, terracing, organic and agroecological.	traditional-ecological-knowledge
+food-technology	agriculture	Food processing and preservation	food technology	Preserving and processing food: drying, salting, fermenting, canning, refrigerating.	cooking
+transport	technology	Transport	transportation	Moving people and goods.
+road-transport	transport	Road transport		Roads and road vehicles, from carts to cars.
+rail-transport	transport	Rail transport	railways	Railways and trains.
+water-transport	transport	Water transport and navigation	shipping|navigation	Boats and ships, ports and navigation.	traditional-navigation
+air-transport	transport	Air transport	aviation	Aircraft and aviation.
+spaceflight	transport|astronomy	Spaceflight and space exploration	space exploration	Travel into and through outer space.	remote-sensing
+construction	technology	Construction and building technology	building	Building structures, from earth and timber to steel and concrete.	architecture
+military-technology	technology	Military technology	weapons	Weapons, fortifications and other technology of war.	conflict-and-peace
+biotechnology	technology|molecular-biology	Biotechnology	genetic engineering	Using living systems and molecules to make products and change organisms.	genetics

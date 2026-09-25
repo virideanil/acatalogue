@@ -1,0 +1,70 @@
+from	to	relation	note
+acat/matter	propaedia/1	closeMatch
+acat/matter	udc/5	broadMatch	UDC 5 also holds mathematics, earth and life sciences
+acat/matter	ddc/500	broadMatch
+acat/matter	lcc/Q	broadMatch
+acat/earth	propaedia/2	closeMatch
+acat/earth	udc/5	broadMatch
+acat/earth	ddc/500	broadMatch	DDC 550 earth sciences
+acat/earth	lcc/Q	broadMatch	LCC QE geology
+acat/earth	lcc/G	relatedMatch	LCC GB physical geography
+acat/life	propaedia/3	closeMatch
+acat/life	udc/5	broadMatch
+acat/life	ddc/500	broadMatch	DDC 570-590 life sciences
+acat/life	lcc/Q	broadMatch	LCC QH-QR
+acat/health	propaedia/4	relatedMatch	Propaedia Part 4 joins body, health and behaviour
+acat/health	udc/6	broadMatch	UDC 61 medical sciences
+acat/health	ddc/600	broadMatch	DDC 610 medicine and health
+acat/health	lcc/R	closeMatch
+acat/mind	propaedia/4	relatedMatch
+acat/mind	udc/1	broadMatch	UDC 159.9 psychology sits in class 1
+acat/mind	ddc/100	broadMatch	DDC 150 psychology sits with philosophy
+acat/mind	lcc/B	broadMatch	LCC BF psychology
+acat/society	propaedia/5	closeMatch
+acat/society	udc/3	closeMatch
+acat/society	ddc/300	closeMatch
+acat/society	lcc/H	closeMatch
+acat/society	lcc/J	narrowMatch
+acat/society	lcc/K	narrowMatch
+acat/society	lcc/L	narrowMatch
+acat/language	udc/8	broadMatch	UDC 8 also holds literature
+acat/language	ddc/400	closeMatch
+acat/language	lcc/P	broadMatch	LCC P also holds literature
+acat/arts	propaedia/6	closeMatch
+acat/arts	udc/7	broadMatch	UDC 7 also holds recreation and sport
+acat/arts	ddc/700	broadMatch	DDC 700 also holds recreation
+acat/arts	lcc/M	narrowMatch
+acat/arts	lcc/N	narrowMatch
+acat/literature	ddc/800	closeMatch
+acat/everyday	udc/7	relatedMatch	recreation, entertainment, sport
+acat/everyday	ddc/700	relatedMatch	DDC 790 recreational arts
+acat/everyday	ddc/600	relatedMatch	DDC 640 home and family management
+acat/everyday	lcc/G	relatedMatch	LCC GT manners and customs, GV recreation
+acat/technology	propaedia/7	closeMatch
+acat/technology	udc/6	broadMatch
+acat/technology	ddc/600	broadMatch
+acat/technology	lcc/T	closeMatch
+acat/technology	lcc/S	narrowMatch
+acat/technology	lcc/U	narrowMatch
+acat/technology	lcc/V	narrowMatch
+acat/belief	propaedia/8	closeMatch
+acat/belief	udc/2	closeMatch
+acat/belief	ddc/200	closeMatch
+acat/belief	lcc/B	broadMatch	LCC B also holds philosophy and psychology
+acat/thought	propaedia/10	closeMatch
+acat/thought	udc/0	relatedMatch
+acat/thought	udc/1	relatedMatch
+acat/thought	ddc/000	relatedMatch
+acat/thought	ddc/100	relatedMatch
+acat/thought	lcc/B	relatedMatch
+acat/thought	lcc/Z	narrowMatch
+acat/information-science	udc/0	closeMatch
+acat/information-science	lcc/Z	closeMatch
+acat/past	propaedia/9	closeMatch
+acat/past	udc/9	broadMatch	UDC 9 also holds geography and biography
+acat/past	ddc/900	broadMatch	DDC 900 also holds geography
+acat/past	lcc/C	narrowMatch
+acat/past	lcc/D	narrowMatch
+acat/past	lcc/E	narrowMatch
+acat/past	lcc/F	narrowMatch
+acat/auxiliary-sciences-of-history	lcc/C	exactMatch

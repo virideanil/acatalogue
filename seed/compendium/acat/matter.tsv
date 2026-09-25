@@ -1,0 +1,37 @@
+code	broader	label	alt	scope_note	related	facets	notation	when
+matter		Matter & Energy	physical sciences|physical universe	The physical universe at every scale — matter, energy, forces, space and time — from subatomic particles to the cosmos.	earth|thought
+physics	matter	Physics		The study of matter, energy, motion and force, and of the laws that relate them.	chemistry|astronomy|mathematics
+classical-mechanics	physics	Classical mechanics	mechanics	Motion of bodies under forces at everyday scales and speeds: laws of motion, energy, momentum, oscillation.	mechanical-engineering
+thermodynamics	physics	Thermodynamics and statistical physics	heat|statistical mechanics	Heat, work, temperature and entropy, and how the collective behaviour of very many particles gives rise to them.	physical-chemistry
+electromagnetism	physics	Electromagnetism	electricity|magnetism	Electric and magnetic fields, charges and currents, and light as an electromagnetic wave.	electrical-engineering
+optics	physics	Optics	light	The behaviour of light and other electromagnetic radiation and its interaction with matter.	photography|observational-astronomy
+acoustics	physics	Acoustics	sound	Sound and vibration: how they are produced, transmitted and perceived.	music-theory|musical-instruments
+fluid-dynamics	physics	Fluid dynamics	fluid mechanics	The flow of liquids and gases, from blood in vessels to winds and ocean currents.	meteorology|oceanography|aerospace-engineering
+relativity	physics	Relativity	special relativity|general relativity	Special and general relativity: space and time, motion at high speeds, and gravitation as the curvature of spacetime.	cosmology
+quantum-physics	physics	Quantum physics	quantum mechanics	The behaviour of matter and energy at atomic and subatomic scales, where quantities come in discrete amounts and outcomes are probabilistic.	particle-physics|physical-chemistry
+particle-physics	physics	Particle physics	high-energy physics	Elementary particles and the fundamental interactions between them.	nuclear-physics|cosmology
+nuclear-physics	physics	Nuclear physics		Atomic nuclei: their structure, reactions and radioactivity, including fission and fusion.	nuclear-energy
+atomic-and-molecular-physics	physics	Atomic and molecular physics	atomic physics|molecular physics	The structure of atoms and molecules and their interactions with light and with each other.	physical-chemistry
+condensed-matter-physics	physics	Condensed matter physics	solid-state physics	Solids and liquids: properties such as conductivity, magnetism and superconductivity that arise from many interacting particles.	materials-science
+plasma-physics	physics	Plasma physics		Ionized gases — the state of most visible matter in the universe — from stars and lightning to fusion reactors.	stars
+chemistry	matter	Chemistry		The composition, structure and properties of substances and the reactions that transform them.	physics|biochemistry
+chemical-elements	chemistry	Chemical elements and the periodic table	periodic table	The known elements, their properties, and the periodic regularities that organize them.	nuclear-physics
+inorganic-chemistry	chemistry	Inorganic chemistry		Compounds of all elements other than those centred on carbon chains: minerals, metals, salts, coordination compounds.	mineralogy|metallurgy
+organic-chemistry	chemistry	Organic chemistry		Carbon-based compounds, their structure, reactions and synthesis.	biochemistry|polymer-chemistry
+physical-chemistry	chemistry	Physical chemistry		The physical principles behind chemical systems: energy, rates and equilibrium of reactions, molecular structure.	thermodynamics|quantum-physics
+analytical-chemistry	chemistry	Analytical chemistry		Methods for identifying substances and measuring how much of each is present.	metrology
+biochemistry	chemistry|molecular-biology	Biochemistry		The chemistry of living things: proteins, nucleic acids, metabolism and the reactions that sustain life.	cell-biology
+polymer-chemistry	chemistry	Polymer chemistry	macromolecules	Large molecules built from repeating units, natural and synthetic: plastics, rubber, fibres, proteins.	materials-science
+electrochemistry	chemistry	Electrochemistry		Chemical reactions that produce or consume electric current: batteries, electrolysis, corrosion.	energy-storage
+astronomy	matter	Astronomy and space science	space science	Celestial objects, space and the physical universe beyond Earth.	physics|spaceflight
+solar-system	astronomy	The Solar System		The Sun and the planets, moons, asteroids, comets and dust bound to it.	planetary-science
+planetary-science	astronomy	Planetary science		The formation, composition and evolution of planets and moons, including Earth seen as one planet among others.	geology|solar-system
+stars	astronomy	Stars and stellar astrophysics		How stars form, shine, evolve and die, and the remnants they leave.	plasma-physics
+galaxies	astronomy	Galaxies		Galaxies and galaxy clusters: their structure, formation and distribution.	cosmology
+cosmology	astronomy	Cosmology		The origin, evolution and large-scale structure of the universe as a whole.	relativity|particle-physics|creation-narratives
+astrophysics	astronomy	Astrophysics		Physics applied to astronomical objects and phenomena.	stars|galaxies
+astrobiology	astronomy|life	Astrobiology		The origin, evolution and distribution of life in the universe, and the search for life beyond Earth.	origin-of-life
+observational-astronomy	astronomy	Observational astronomy	telescopes	Observing the sky across the electromagnetic spectrum and beyond, and the instruments used to do it.	optics
+cultural-astronomy	astronomy	Cultural astronomy	ethnoastronomy|archaeoastronomy	How different cultures, past and present, have observed, named and used the sky: calendars, navigation, sky lore.	calendars-and-timekeeping|traditional-navigation|astrology
+metrology	matter	Measurement and metrology	metrology|measurement	The science of measurement: standards, instruments, uncertainty and the definition of units.	analytical-chemistry
+units-of-measurement	metrology	Units of measurement	SI units|weights and measures	Systems of units, including the International System (SI) and the many traditional systems used around the world.	numeral-systems

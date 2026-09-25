@@ -1,0 +1,377 @@
+"""`acat` — the command line. Run `acat -h` or `acat <command> -h`."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+from . import db as dbm
+from .db import DEFAULT_DB
+
+ANSI_MATCH, ANSI_DIM, ANSI_ID, ANSI_OFF = "\x1b[1;31m", "\x1b[2m", "\x1b[36m", "\x1b[0m"
+
+
+def _color(flag: str) -> bool:
+    if flag == "always":
+        return True
+    if flag == "never" or os.environ.get("NO_COLOR"):
+        return False
+    return sys.stdout.isatty()
+
+
+def _render(parts: list[dict], color: bool) -> str:
+    out = []
+    for p in parts:
+        t = p["t"].replace("\n", " ")
+        out.append(f"{ANSI_MATCH}{t}{ANSI_OFF}" if (p["m"] and color) else (f"[{t}]" if p["m"] else t))
+    return "".join(out)
+
+
+def _ro(args) -> "dbm.sqlite3.Connection":
+    return dbm.connect(args.db, readonly=True)
+
+
+# ─── commands ────────────────────────────────────────────────────────────────
+
+
+def cmd_build(args) -> int:
+    from .build import build
+    report = build(args.db)
+    dangling = report["links"]["facets_dangling"] + report["links"]["mappings_dangling"]
+    print(f"built {args.db}")
+    if dangling:
+        print(f"{len(dangling)} links point at concepts that do not exist:", *dangling[:20], sep="\n  ")
+        return 1
+    return 0
+
+
+def cmd_semantic(args) -> int:
+    from . import semantic
+    conn = dbm.connect(args.db)
+    with conn:
+        print(json.dumps(semantic.build(conn, dims=args.dims, k=args.k), indent=2))
+    return 0
+
+
+def cmd_grep(args) -> int:
+    from .grep import GrepError, grep
+    color = _color(args.color)
+    conn = _ro(args)
+    try:
+        res = grep(conn, args.pattern, mode=args.mode, scope=args.scope, limit=args.limit, under=args.under,
+                   lang=args.lang)
+    except GrepError as exc:
+        print(f"acat grep: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(res.as_dict(), ensure_ascii=False, indent=None if args.jsonl else 2))
+        return 0 if res.hits else 1
+    if args.explain:
+        for s in res.sql:
+            print(f"{ANSI_DIM if color else ''}-- {s}{ANSI_OFF if color else ''}")
+        for n in res.notes:
+            print(f"{ANSI_DIM if color else ''}-- note: {n}{ANSI_OFF if color else ''}")
+    if args.count:
+        counts: dict[str, int] = {}
+        for h in res.hits:
+            counts[h.type] = counts.get(h.type, 0) + 1
+        for k, v in sorted(counts.items()):
+            print(f"{k}\t{v}")
+        return 0 if res.hits else 1
+    seen = set()
+    for h in res.hits:
+        if args.files_only:
+            if h.target not in seen:
+                seen.add(h.target)
+                print(h.target)
+            continue
+        tag = h.type + (f"[{h.lang}]" if h.lang else "")
+        ident = f"{ANSI_ID}{h.target}{ANSI_OFF}" if color else h.target
+        print(f"{ident}\t{tag}\t{h.title}\t{_render(h.parts, color)}")
+    if not args.json and sys.stderr.isatty():
+        print(f"{res.total} hits in {res.elapsed_ms} ms", file=sys.stderr)
+    return 0 if res.hits else 1
+
+
+def cmd_grep_db(args) -> int:
+    from .grep import grep_any
+    color = _color(args.color)
+    hits, sqls = grep_any(args.file, args.pattern, mode="regex" if args.regex else "substring",
+                          limit_per_column=args.limit, tables=args.table or None)
+    if args.explain:
+        for s in sqls:
+            print(f"-- {s}")
+    if args.json:
+        print(json.dumps([h.__dict__ for h in hits], ensure_ascii=False, indent=2))
+    else:
+        for h in hits:
+            print(f"{h.table}.{h.column}[{h.key}]\t{_render(h.parts, color)}")
+    return 0 if hits else 1
+
+
+def cmd_sql(args) -> int:
+    conn = _ro(args)
+    cur = conn.execute(args.query)
+    cols = [d[0] for d in cur.description or []]
+    rows = cur.fetchmany(args.limit)
+    if args.json:
+        print(json.dumps([dict(zip(cols, r)) for r in rows], ensure_ascii=False, indent=2, default=str))
+    else:
+        print("\t".join(cols))
+        for r in rows:
+            print("\t".join("" if v is None else str(v) for v in r))
+    return 0
+
+
+def cmd_show(args) -> int:
+    from .views import resolve
+    conn = _ro(args)
+    rec = resolve(conn, args.id)
+    if rec is None:
+        print(f"acat show: nothing is called {args.id!r}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(rec, ensure_ascii=False, indent=2, default=str))
+        return 0
+    if rec["kind"] != "concept":
+        for k, v in rec.items():
+            print(f"{k:14s} {v}")
+        return 0
+    print(f"{rec['label']}  ({rec['id']})  [{rec['status']}]")
+    if rec.get("scope_note"):
+        print(f"  {rec['scope_note']}")
+    if rec.get("time_from") is not None or rec.get("time_to") is not None:
+        print(f"  when: {rec.get('time_from')} .. {rec.get('time_to')} (astronomical years)")
+    print(f"  labels: {len(rec['labels'])} in {rec['n_label_langs']} languages; Wikipedia editions: {rec['langs']}")
+    wanted = {"tr", "ar", "zh", "hi", "sw", "es", "ru", "fr", "yo", "id"}
+    sample = [f"{l['lang']}:{l['text']}" for l in rec["labels"] if l["kind"] == "pref" and l["lang"] in wanted]
+    if sample:
+        print("  e.g. " + " · ".join(sample))
+    for key in ("broader", "narrower", "related", "facets"):
+        if rec[key]:
+            print(f"  {key}: " + ", ".join(f"{x['label']} ({x['id']})" for x in rec[key][:25]))
+    for m in rec["mappings"]:
+        print(f"  mapping: {m['relation']} {m['id']} {m['label']} [{m['method']}, {m['status']}]")
+    for d in rec["documents"]:
+        print(f"  document: {d['id']} — {d['license']} — {d['url']}")
+    for c in rec["claims"][:20]:
+        print(f"  claim: {c['subject']} {c['predicate_label'] or c['predicate']} {c['object_label'] or c['value']}"
+              f"  [{c['epistemic']}, rank {c['rank']}]")
+    for n in rec["neighbors"]:
+        print(f"  near: {n['label']} ({n['id']}) {n['score']:.3f} [{n['model']}]")
+    for p in rec["provenance"]:
+        print(f"  from: {p['source']} sha512:{p['sha512'][:16]}…")
+    return 0
+
+
+def cmd_tree(args) -> int:
+    from .views import tree
+    for line in tree(_ro(args), args.root, args.depth, args.scheme):
+        print(line)
+    return 0
+
+
+def cmd_stats(args) -> int:
+    from .views import stats
+    print(json.dumps(stats(_ro(args), str(args.db)), ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_audit(args) -> int:
+    from .views import audit
+    a = audit(_ro(args))
+    if args.json:
+        print(json.dumps(a, ensure_ascii=False, indent=2))
+        return 0
+    print("Coverage by domain (langs = Wikipedia language editions of the matched item)")
+    print(f"{'domain':34s} {'concepts':>8s} {'matched':>8s} {'docs':>6s} {'median':>7s} {'min':>5s}  thinnest")
+    for d in a["domains"]:
+        print(f"{d['label'][:34]:34s} {d['concepts']:8d} {d['reconciled']:8d} {d['docs']:6d} "
+              f"{str(d['median_langs']):>7s} {str(d['min_langs']):>5s}  {d['min_langs_id']}")
+    print("\nThinnest coverage (fewest language editions):")
+    for t in a["thinnest"][:15]:
+        print(f"  {t['langs']:4d}  {t['label']} ({t['id']})")
+    print("\nConcepts tagged per world region (UN M49):")
+    for r in a["regions"]:
+        print(f"  {r['tagged']:4d}  {r['label']}")
+    h = a["hierarchy_vs_wikidata"]
+    print(f"\nACAT parent links also stated by Wikidata: {h['stated']}; not stated: {h['not_stated']}")
+    print(f"Label languages: {a['label_language_count']}; concepts without a Wikidata match: {len(a['unmatched'])}")
+    for n in a["notes"]:
+        print(f"note: {n}")
+    return 0
+
+
+def cmd_verify(args) -> int:
+    from . import ledger
+    from .compendium import read_all
+    from .corpusfile import CorpusFile, list_corpora
+    ok = True
+    _, problems = read_all()
+    print(f"seeds: {'valid' if not problems else f'{len(problems)} problems'}")
+    for p in problems:
+        print("  ", p)
+    ok &= not problems
+    for path in list_corpora():
+        c = CorpusFile(path, readonly=True)
+        good, msg = c.verify()
+        print(f"corpus: {msg}" + ("" if c.sealed else "  (NOT sealed)"))
+        ok &= good and c.sealed
+    if Path(args.db).exists():
+        good, n, msg = ledger.verify(_ro(args))
+        print(f"ledger: {msg}")
+        ok &= good
+    return 0 if ok else 1
+
+
+def cmd_serve(args) -> int:
+    from .server import serve
+    serve(args.db, host=args.host, port=args.port)
+    return 0
+
+
+def cmd_export_graph(args) -> int:
+    from .views import graph
+    g = graph(_ro(args))
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps(g, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"wrote {args.out}: {len(g['nodes'])} nodes, {len(g['edges'])} edges")
+    return 0
+
+
+def cmd_compendium_md(args) -> int:
+    from .docs import write_compendium_md
+    n = write_compendium_md(_ro(args), Path(args.out))
+    print(f"wrote {args.out}: {n} concepts")
+    return 0
+
+
+def cmd_fetch(args) -> int:
+    from .sources import external, m49, wikidata, wikipedia
+    if args.source == "m49":
+        c = m49.fetch()
+    elif args.source == "external":
+        c = external.fetch()
+    elif args.source == "wikidata":
+        decisions = wikidata.read_decisions()
+        qids = sorted({d["to"][3:] for d in decisions if d["status"] == "accepted" and d["to"].startswith("wd/")},
+                      key=lambda q: int(q[1:]))
+        c = wikidata.fetch_entities(qids)
+        wikidata.fetch_claims(qids, c)
+        c.seal()
+    else:
+        from .build import latest_corpus
+        decisions = wikidata.read_decisions()
+        wanted = {d["to"][3:] for d in decisions if d["status"] == "accepted"
+                  and d["relation"] in wikidata.LABEL_RELATIONS}
+        ents = latest_corpus("wikidata-entities")
+        if ents is None:
+            print("fetch wikidata entities first", file=sys.stderr)
+            return 1
+        titles = []
+        for it in ents.items():
+            if it["name"].startswith("entities/"):
+                for qid, e in json.loads(ents.get(it["name"]))["entities"].items():
+                    if qid in wanted and "enwiki" in e.get("sitelinks", {}):
+                        titles.append(e["sitelinks"]["enwiki"]["title"])
+        c = wikipedia.fetch_intros(titles)
+        c.seal()
+    print(f"{c.name}: {len(c.items())} items, sealed={c.sealed}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="acat", description="acatalogue: a curated, attributed catalogue of knowledge")
+    ap.add_argument("--db", type=Path, default=Path(os.environ.get("ACAT_DB", DEFAULT_DB)),
+                    help="catalogue database (default: data/acatalogue.sqlite, or $ACAT_DB)")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("build", help="seeds + sealed corpora -> the catalogue database")
+    p.set_defaults(fn=cmd_build)
+    p = sub.add_parser("semantic", help="build the LSA semantic layer (needs numpy)")
+    p.add_argument("--dims", type=int, default=48)
+    p.add_argument("--k", type=int, default=6, help="neighbours per concept")
+    p.set_defaults(fn=cmd_semantic)
+
+    p = sub.add_parser("grep", help="the SQL grepper over concepts, passages and labels")
+    p.add_argument("pattern")
+    p.add_argument("-m", "--mode", choices=["words", "substring", "regex"], default="words")
+    p.add_argument("-F", dest="mode", action="store_const", const="substring", help="same as --mode substring")
+    p.add_argument("-E", dest="mode", action="store_const", const="regex", help="same as --mode regex")
+    p.add_argument("-s", "--scope", choices=["all", "concepts", "passages", "labels"], default="all")
+    p.add_argument("-n", "--limit", type=int, default=20, help="max hits per scope")
+    p.add_argument("--under", help="only hits under this concept (subtree)")
+    p.add_argument("--lang", help="labels scope: only this language")
+    p.add_argument("-c", "--count", action="store_true", help="count hits per type")
+    p.add_argument("-l", "--files-only", action="store_true", help="print matching ids only")
+    p.add_argument("--explain", action="store_true", help="print the SQL that ran")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--jsonl", action="store_true", help="with --json: one line")
+    p.add_argument("--color", choices=["auto", "always", "never"], default="auto")
+    p.set_defaults(fn=cmd_grep)
+
+    p = sub.add_parser("grep-db", help="grep every text column of any SQLite file (read-only)")
+    p.add_argument("file")
+    p.add_argument("pattern")
+    p.add_argument("-E", "--regex", action="store_true")
+    p.add_argument("-t", "--table", action="append", help="only this table (repeatable)")
+    p.add_argument("-n", "--limit", type=int, default=20, help="max hits per column")
+    p.add_argument("--explain", action="store_true")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--color", choices=["auto", "always", "never"], default="auto")
+    p.set_defaults(fn=cmd_grep_db)
+
+    p = sub.add_parser("sql", help="run one read-only SQL statement")
+    p.add_argument("query")
+    p.add_argument("-n", "--limit", type=int, default=1000)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_sql)
+
+    p = sub.add_parser("show", help="resolve any scoped id (acat/…, space/…, wd/…, doc/…, src/sha512:…)")
+    p.add_argument("id")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_show)
+
+    p = sub.add_parser("tree", help="print the compendium as a tree")
+    p.add_argument("root", nargs="?")
+    p.add_argument("-d", "--depth", type=int, default=1)
+    p.add_argument("--scheme", default="acat")
+    p.set_defaults(fn=cmd_tree)
+
+    p = sub.add_parser("stats", help="row counts, corpora, ledger head")
+    p.set_defaults(fn=cmd_stats)
+    p = sub.add_parser("audit", help="coverage and bias measurements")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_audit)
+    p = sub.add_parser("verify", help="validate seeds, re-hash every corpus, check the ledger chain")
+    p.set_defaults(fn=cmd_verify)
+
+    p = sub.add_parser("serve", help="HTTP API + the particle field")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8765)
+    p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("export-graph", help="write the /api/graph payload to a file (static mode)")
+    p.add_argument("out", nargs="?", default="viz/data/graph.json")
+    p.set_defaults(fn=cmd_export_graph)
+    p = sub.add_parser("compendium-md", help="write the compendium as Markdown")
+    p.add_argument("out", nargs="?", default="docs/COMPENDIUM.md")
+    p.set_defaults(fn=cmd_compendium_md)
+
+    p = sub.add_parser("fetch", help="fetch a source into a new dated, sealed corpus")
+    p.add_argument("source", choices=["m49", "external", "wikidata", "wikipedia"])
+    p.set_defaults(fn=cmd_fetch)
+
+    args = ap.parse_args(argv)
+    try:
+        return args.fn(args)
+    except FileNotFoundError as exc:
+        print(f"acat: {exc}", file=sys.stderr)
+        return 2
+    except BrokenPipeError:
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
