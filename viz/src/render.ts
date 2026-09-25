@@ -55,7 +55,7 @@ export const RENDER = Object.freeze({
   ringWidth: 2,
   /** Surface-coloured outline around emphasised marks (the 2px surface ring). */
   surfaceRing: 1.5,
-  /** Marks smaller than this radius (screen px) are drawn as area-matched squares (raster cost). */
+  /** Marks smaller than this radius in device pixels are drawn as area-matched squares (raster cost). */
   squareBelowRadius: 1.75,
 });
 
@@ -497,7 +497,8 @@ export class Renderer {
       order[counts[keys[i]!]!++] = i;
     }
     const TAU = Math.PI * 2;
-    const squareBelow = RENDER.squareBelowRadius;
+    // Device pixels decide: on a dense screen the same mark stays a disc.
+    const squareBelow = RENDER.squareBelowRadius / this.dpr;
     let k = 0;
     while (k < total) {
       const key = keys[order[k]!]!;

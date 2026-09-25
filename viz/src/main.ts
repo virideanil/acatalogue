@@ -180,7 +180,7 @@ class App {
     } catch {
       // keep the raw url
     }
-    const where = g.source === "api" ? "live API" : g.source === "static" ? "static data/graph.json" : `${file} (?graph)`;
+    const where = g.source === "api" ? "live API" : g.source === "static" ? "static data/graph.json" : `${file} (?\u2060graph)`;
     const synthetic = g.payload.schemes.some((s) => /synthetic/i.test(s.title) || s.origin === "synthetic") ? " · SYNTHETIC test data" : "";
     const parts = [`${g.payload.nodes.length.toLocaleString("en")} concepts`, `${sim.m.toLocaleString("en")} links`, where + synthetic];
     if (!this.apiOnline) parts.push("API not reachable");
