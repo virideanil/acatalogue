@@ -258,6 +258,27 @@ SQL it ran (`--explain`, and the `sql` field in the API):
 `acat grep-db <file.sqlite> <pattern>` greps every text column of *any* SQLite file read-only —
 for databases that are not catalogues at all.
 
+### 6.1 Semantic search, measured before it is trusted
+
+"Semantically" is a claim about retrieval, so it is measured. `acat eval` runs a leave-one-language-
+out test: for each of 28 languages chosen across scripts and regions (Spanish, German, Turkish,
+Vietnamese, Indonesian, Russian, Kazakh, Greek, Armenian, Georgian, Arabic, Persian, Urdu, Hebrew,
+Hindi, Bengali, Tamil, Chinese, Japanese, Korean, Thai, Burmese, Swahili, Hausa, Yoruba, Amharic,
+Quechua, Māori), every ACAT concept's preferred label in that language becomes a query whose one
+right answer is the concept, and every label in that language is hidden from the index while it
+runs. A system has to find the concept through the other languages' names — the situation of a
+reader whose language the catalogue covers thinly. English is left out: the catalogue is written
+in it. Every query and every rank is stored (`eval_*` tables); intervals are stratified bootstrap
+percentiles, comparisons paired randomization tests.
+
+The systems compared: FTS5 words (bm25); character-trigram similarity (cognates and
+transliterations); the LSA layer, folding the query in; multilingual-e5-large-instruct, a dense
+multilingual model run locally from its own ONNX export and pinned by revision and file hashes
+(`acat embed`); and reciprocal rank fusion (k = 60). All but LSA search the same index: the
+preferred and alternative labels of the ACAT concepts.
+
+*Results: the full run is computing; its numbers replace this paragraph in the next commit.*
+
 ## 7. The particle field
 
 `acat serve` opens the database read-only and serves the particle field (`viz/`, TypeScript,

@@ -1,4 +1,4 @@
-# The founding brief and what became of it
+# The requests and what became of them
 
 ## The request, verbatim (2026-09-25)
 
@@ -35,3 +35,41 @@ Ordered from truth and loss (D1) to cosmetic (D7). Each line says what it relate
 - **OpenAlex topics**: the API now requires a (free) key; the shared anonymous budget was exhausted.
 - **Human review of the compendium and the reconciliation**: both were done by one AI agent in one
   session and are marked as such in the data.
+
+## The second request, verbatim (2026-09-25)
+
+> please do further improvements on it with first proper research and then implementation with
+> proper skills please.
+
+## Dispositions of the second request
+
+Research first: six researchers, then one report —
+[reports/Improving the acatalogue knowledge base.md](../reports/Improving%20the%20acatalogue%20knowledge%20base.md)
+(49 changes ranked D1 → D7, 146 external sources; notes and prototypes in `research_notes/`). Then the
+changes below, in that order. Skills used: *deep-research* (the research), *dataviz* (the audit chart:
+palette validated with its script on the Papyrus and Sea surfaces), *run* (the particle field driven
+live in Chromium against the API, screenshots checked); an independent reviewer read the code.
+
+| D | What | Disposition | Receipt |
+|---|---|---|---|
+| D1 | Error bodies sealed as data | **Fixed.** Every fetch passes a response check; MediaWiki/World Bank errors inside HTTP 200 are logged and refused; `maxlag=5`, gzip, policy-format User-Agent, patient backoff. | `tests/test_fetch.py`; the statements corpus' fetch log shows 11 refused `maxlag` bodies; every committed response passes the checks |
+| D1 | Claims read from query summaries lost statement identity, qualifiers, references, "unknown/no value", revisions | **Fixed.** 48,210 statements from entity JSON, one claim each, with GUID, rank, snak type, revision and a JSON Pointer; 19,771 qualifiers and 10,168 references as rows; summaries superseded per entity. | `tests/test_statements.py`; 500/500 sampled pointers resolve in the sealed bytes |
+| D1 | Dates: BCE off by one, Julian dates, text sorting | **Fixed.** Astronomical years, Julian day dates converted, Wikidata century/millennium spans, integer day bounds. | known anchors in `tests/test_statements.py` (1582 reform, October Revolution, Ides of March 44 BCE, J2000) |
+| D1 | Search correctness (case folding, combining marks, CJK pairs, regex prefilter, label rowids) | **Fixed** (first commit of the round). | `tests/test_grep.py`: 0 misses against a brute-force scan on randomized needles and regexes |
+| D1 | In-place schema upgrade without loss | **Built.** v1 → v4 migrations, each copying or adding and ledgered. | migration tests; the real database kept all 4,045 claims through v2 → v4 |
+| D2 | Bias: counts without baselines | **Built.** Regional shares vs population, land area and equal shares, Wilson intervals, JSD with bootstrap and a random-sampling null, entropy, Gini; sibling parity; sourced-statement share; stored per build. Sitelinks without the bot-generated Cebuano and Waray editions. | `tests/test_audit.py` (Wilson values match published ones); `acat audit`; `corpora/worldbank-wdi-20260925` |
+| D2 | Machine proposals indistinguishable from human decisions | **Built.** A review ledger (`seed/reviews/`, `acat review`), applied on top of proposals; agent reviews never decide; the audit counts deciders (572 AI, 0 human so far). | `tests/test_review.py` (a real build where an objection stops label copying) |
+| D3 | "as semantically": is the semantic layer any good across languages? | **Measured, then extended.** The leave-one-language-out harness is built and tested, and the dense multilingual model runs locally, pinned and verified; the full run (11,486 queries, six systems) is computing in this session and its numbers replace this sentence in the next commit. | `acat eval`; `tests/test_eval.py`; `eval_*` tables |
+| D5 | Particle field: settling time, no pause, no non-visual route, hairball | **Built; the visual verdict is yours.** Baked layout (0.2 s to first paint instead of 23 s; the same 2,656 steps in Node and Chromium), Pause motion, an ARIA tree view, cross-cluster links on demand, numbers on the coverage ramp, the audit chart, statement claims with their evidence, no overlapping labels on phones. | 26 viz tests; 4 bake tests (two bakes identical); live Playwright run with no console errors |
+
+### Not done in this round, and why
+
+- **Your review.** Every crosswalk decision is still an AI agent's; the queue is ready
+  (`acat review queue`). Whether unreviewed `exactMatch` links should be downgraded to `closeMatch`
+  until a person looks at them is a policy choice for you, not for me.
+- **The Sea theme's surface colour** is still the assumed `#0f1c21`.
+- **Constraint checks from Wikidata's own property constraints (report 2.4), tamper evidence beyond the
+  hash chain (2.8), dumps and EventStreams for scale (tier 4), WebGL and workers (6.3–6.7)**: planned in
+  the report, not needed at today's size, not built.
+- **Language-region diversity per concept and label coverage against speaker shares** (report 3.5,
+  second half) need a language → region table with a source; not built.
