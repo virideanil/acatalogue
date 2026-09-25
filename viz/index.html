@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>acatalogue field</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="dist/main.js"></script>
+  </head>
+  <body>
+    <aside id="panel" aria-label="Work panel">
+      <header class="panel-head">
+        <div class="brand">
+          <h1>acatalogue</h1>
+          <p id="source" class="source" aria-live="polite">Loading…</p>
+        </div>
+        <div class="head-actions">
+          <button id="theme-toggle" type="button" class="ghost">Dark theme</button>
+          <button id="panel-toggle" type="button" class="ghost mobile-only" aria-expanded="true" aria-controls="panel-body">Hide panel</button>
+        </div>
+      </header>
+
+      <section class="search" aria-label="Grep the catalogue">
+        <form id="search-form" role="search" autocomplete="off">
+          <label for="q" class="visually-hidden">Search the catalogue</label>
+          <input id="q" type="search" placeholder="Grep the catalogue" spellcheck="false" enterkeyhint="search" />
+          <div class="search-options">
+            <label
+              >Mode
+              <select id="mode">
+                <option value="words">words</option>
+                <option value="substring">substring</option>
+                <option value="regex">regex</option>
+              </select>
+            </label>
+            <label
+              >Scope
+              <select id="scope">
+                <option value="all">all</option>
+                <option value="concepts">concepts</option>
+                <option value="passages">passages</option>
+                <option value="labels">labels</option>
+              </select>
+            </label>
+          </div>
+        </form>
+        <p id="search-status" class="status" aria-live="polite"></p>
+        <ol id="results" class="results" aria-label="Search results"></ol>
+        <details id="sql" hidden>
+          <summary>SQL</summary>
+          <pre id="sql-text"></pre>
+        </details>
+      </section>
+
+      <div id="panel-body">
+        <section class="lens" aria-label="Lens">
+          <fieldset>
+            <legend>Lens</legend>
+            <label><input type="radio" name="lens" value="structure" checked /> Structure</label>
+            <label><input type="radio" name="lens" value="coverage" /> Coverage</label>
+          </fieldset>
+          <label class="check"><input id="semantic" type="checkbox" /> Semantic links</label>
+          <button id="fit" type="button" class="ghost">Fit view</button>
+        </section>
+
+        <section id="inspector" class="inspector" aria-label="Inspector" aria-live="polite">
+          <p class="hint">Click a particle or a result to inspect it.</p>
+        </section>
+
+        <details id="audit" class="audit">
+          <summary>Audit: coverage and bias (table view)</summary>
+          <div id="audit-body"><p class="hint">Opens on demand.</p></div>
+        </details>
+
+        <p class="keys-help">Keys: / search · Esc clear · arrows pan · + and − zoom · 0 fit. Drag empty space to pan, drag a particle to pull it.</p>
+      </div>
+    </aside>
+
+    <main id="field" aria-label="Particle field">
+      <canvas id="canvas" role="img" aria-label="Particle field (loading)"></canvas>
+      <div id="key" class="key"></div>
+      <div id="tooltip" class="tooltip" role="status" hidden></div>
+      <p id="field-status" class="field-status" hidden></p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "acatalogue-viz",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Particle field for the acatalogue knowledge database: TypeScript source in src/, compiled ES modules in dist/ (committed), served as static files.",
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "sample": "node test/make-sample.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
