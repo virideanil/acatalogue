@@ -20,6 +20,7 @@ import statistics
 from collections import defaultdict
 
 from . import ledger
+from .review import reviewer_kind
 from .util import utcnow
 
 SEED = 20260925
@@ -271,15 +272,18 @@ def attention(conn: sqlite3.Connection) -> dict:
                                     sorted(changed, key=lambda x: (x[1] - x[2], x[0]))[:10]]}
 
 
-def _reviewer_kind(reviewer: str | None) -> str:
-    r = (reviewer or "").lower()
-    if not r:
-        return "none"
-    if r == "seed":
-        return "seed file (no named reviewer)"
-    if "ai agent" in r or r.startswith("claude"):
-        return "AI agent"
-    return "human"
+def evidence(conn: sqlite3.Connection) -> dict:
+    """How many current source statements cite a source (not only 'imported from Wikimedia project')."""
+    def count(where: str) -> dict:
+        n, refd, sourced = conn.execute(
+            "SELECT count(*), sum(e.references_n > 0), sum(e.sourced) FROM claim c JOIN v_claim_evidence e"
+            f" ON e.claim_id = c.id WHERE c.statement_id IS NOT NULL AND c.superseded_at IS NULL {where}").fetchone()
+        return {"statements": n, "with_reference": refd or 0, "sourced": sourced or 0,
+                "sourced_share": (sourced or 0) / n if n else None}
+    return {"all": count(""),
+            "hierarchy": count("AND c.predicate IN ('wd/P31', 'wd/P279', 'wd/P361', 'wd/P1269')"),
+            "definition": "sourced = some reference names more than P143/P4656 (imported from a Wikimedia "
+                          "project) and P813 (retrieved)"}
 
 
 def review_coverage(conn: sqlite3.Connection) -> dict:
@@ -287,7 +291,7 @@ def review_coverage(conn: sqlite3.Connection) -> dict:
     by: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for reviewer, relation, n in conn.execute(
             "SELECT reviewer, relation, count(*) FROM mapping WHERE status = 'accepted' GROUP BY 1, 2"):
-        by[_reviewer_kind(reviewer)][relation] += n
+        by[reviewer_kind(reviewer)][relation] += n
     human_reviews = conn.execute("SELECT count(*) FROM review WHERE reviewer_kind = 'human'").fetchone()[0] \
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'review'").fetchone() else 0
     return {"accepted_by_decider": {k: dict(v) for k, v in sorted(by.items())}, "human_reviews": human_reviews}
@@ -302,7 +306,8 @@ def run(conn: sqlite3.Connection, actor: str = "acat build") -> dict:
               "params": {"seed": SEED, "bootstrap": BOOTSTRAP, "z": Z, "baselines": list(BASELINES),
                          "excluded_editions": list(BOT_WIKIS)},
               "regions": regional(conn, 1, rng), "subregions": regional(conn, 2, rng),
-              "siblings": sibling_parity(conn), "attention": attention(conn), "review": review_coverage(conn)}
+              "siblings": sibling_parity(conn), "attention": attention(conn), "evidence": evidence(conn),
+              "review": review_coverage(conn)}
     cur = conn.execute("INSERT INTO audit_run(at, ledger_head, params, report) VALUES (?,?,?,?)",
                        (result["generated_at"], result["ledger_head"], json.dumps(result["params"], sort_keys=True),
                         json.dumps(result, sort_keys=True, ensure_ascii=False)))
@@ -334,6 +339,10 @@ def run(conn: sqlite3.Connection, actor: str = "acat build") -> dict:
                  a["concepts"]))
     rows.append((run_id, "attention", "", "median_editions", "all_editions", a["median_all"], None, None,
                  a["concepts"]))
+    for scope, e in result["evidence"].items():
+        if isinstance(e, dict):
+            rows.append((run_id, "evidence", scope, "sourced_share", "", e["sourced_share"], None, None,
+                         e["statements"]))
     for kind, rels in result["review"]["accepted_by_decider"].items():
         for rel, n in rels.items():
             rows.append((run_id, "review", kind, f"accepted_{rel}", "", n, None, None, None))

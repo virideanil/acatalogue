@@ -19,7 +19,7 @@
 
 -- user_version is the schema version; acatalogue/migrate.py upgrades older databases in place
 -- (copying every row that must never be lost) before this file runs.
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -268,6 +268,26 @@ BEGIN SELECT RAISE(ABORT, 'qualifiers belong to claims and are never deleted'); 
 CREATE TRIGGER IF NOT EXISTS claim_reference_never_deleted BEFORE DELETE ON claim_reference
 BEGIN SELECT RAISE(ABORT, 'references belong to claims and are never deleted'); END;
 
+-- ─── claim views: nothing is deleted, so readers filter ─────────────────────
+DROP VIEW IF EXISTS v_claim_current;
+CREATE VIEW v_claim_current AS SELECT * FROM claim WHERE superseded_at IS NULL;
+-- Wikidata's "truthy" reading: current, not deprecated, and preferred when a preferred one exists
+DROP VIEW IF EXISTS v_claim_truthy;
+CREATE VIEW v_claim_truthy AS
+  SELECT c.* FROM claim c WHERE c.superseded_at IS NULL AND coalesce(c.rank, 'normal') <> 'deprecated'
+    AND (c.rank = 'preferred' OR NOT EXISTS (
+      SELECT 1 FROM claim p WHERE p.subject = c.subject AND p.predicate = c.predicate
+        AND p.rank = 'preferred' AND p.superseded_at IS NULL));
+-- sourced: some reference says more than "imported from a Wikimedia project" (P143, P4656) and a
+-- retrieval date (P813); such imports name where a value was copied from, not a source for it
+DROP VIEW IF EXISTS v_claim_evidence;
+CREATE VIEW v_claim_evidence AS
+  SELECT c.id AS claim_id,
+    (SELECT count(DISTINCT r.ref_hash) FROM claim_reference r WHERE r.claim_id = c.id) AS references_n,
+    EXISTS (SELECT 1 FROM claim_reference r WHERE r.claim_id = c.id
+            AND r.property NOT IN ('wd/P143', 'wd/P4656', 'wd/P813')) AS sourced
+  FROM claim c;
+
 -- ─── review: who decided, from which perspective ────────────────────────────
 CREATE TABLE IF NOT EXISTS review (
   id            INTEGER PRIMARY KEY,
@@ -277,6 +297,7 @@ CREATE TABLE IF NOT EXISTS review (
   perspective   TEXT,                 -- the reviewer's declared perspective, tradition or region
   decided_at    TEXT NOT NULL,
   decision      TEXT NOT NULL CHECK (decision IN ('approve', 'revise', 'object')),
+  relation      TEXT,                 -- revise: the relation the mapping should have
   rationale     TEXT,
   source_sha512 TEXT NOT NULL REFERENCES source(sha512),   -- the review file it was read from
   UNIQUE (target, reviewer, decided_at)

@@ -6,6 +6,7 @@ import sqlite3
 import statistics
 
 from . import ledger
+from .review import reviewer_kind
 from .util import utcnow
 
 GRAPH_SCHEMES = ("acat", "space", "kind", "epistemic", "udc", "ddc", "lcc", "propaedia")
@@ -91,7 +92,7 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
         "facets": labelled("SELECT f.facet_id, c.label FROM facet f JOIN concept c ON c.id = f.facet_id"
                            " WHERE f.concept_id = ? ORDER BY f.facet_id", (cid,)),
         "mappings": [{"id": r[0], "label": r[1], "relation": r[2], "method": r[3], "status": r[4], "reviewer": r[5],
-                      "note": r[6]}
+                      "decided_by": reviewer_kind(r[5]), "note": r[6]}
                      for r in conn.execute(
                          "SELECT m.to_id, coalesce(c.label, m.to_id), m.relation, m.method, m.status, m.reviewer, m.note"
                          " FROM mapping m LEFT JOIN concept c ON c.id = m.to_id WHERE m.from_id = ?"
@@ -99,6 +100,13 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
                          " m.reviewer, m.note FROM mapping m JOIN concept c ON c.id = m.from_id WHERE m.to_id = ?"
                          " ORDER BY 1", (cid, cid))],
         "documents": documents, "claims": claims, "neighbors": neighbors, "attributes": attrs, "provenance": prov,
+        "reviews": [{"target": r[0], "reviewer": r[1], "reviewer_kind": r[2], "perspective": r[3], "decided_at": r[4],
+                     "decision": r[5], "relation": r[6], "rationale": r[7]}
+                    for r in conn.execute(
+                        "SELECT target, reviewer, reviewer_kind, perspective, decided_at, decision, relation, rationale"
+                        " FROM review"
+                        " WHERE target = ? OR target LIKE ? OR target LIKE ? ORDER BY decided_at",
+                        (f"concept:{cid}", f"mapping:{cid}|%", f"label:{cid}|%"))],
     }
 
 

@@ -26,6 +26,13 @@ LABEL_RELATIONS = {"exactMatch", "closeMatch"}   # only these donate their label
 # Lsjbot mass-generated the Cebuano and Waray editions (species and places), so their sitelinks
 # measure a bot's reach, not human attention: the attention count leaves them out (raw count kept)
 BOT_WIKIS = ("cebwiki", "warwiki")
+PROJECT_WIKIS = ("commonswiki", "specieswiki", "metawiki", "mediawikiwiki", "wikidatawiki", "sourceswiki")
+
+
+def wikipedia_editions(sitelinks: dict, *, with_bot_editions: bool = False) -> list[str]:
+    """Language editions of Wikipedia among an item's sitelinks (not Commons, Wikispecies, etc.)."""
+    return [k for k in sitelinks if k.endswith("wiki") and k not in PROJECT_WIKIS
+            and (with_bot_editions or k not in BOT_WIKIS)]
 CLAIM_PROPERTIES = {
     "P31": "instance of", "P279": "subclass of", "P361": "part of", "P527": "has part(s)",
     "P2578": "studies", "P2579": "studied by", "P1269": "facet of",
@@ -385,13 +392,11 @@ def import_entities(conn: sqlite3.Connection, corpus: CorpusFile, decisions: lis
                                  " VALUES (?,?,?,?,?)", (target, lang, kind, text, digest))
                     stats["copied_labels"] += 1
             sitelinks = ent.get("sitelinks", {})
-            wikis = [k for k in sitelinks if k.endswith("wiki") and k not in ("commonswiki", "specieswiki",
-                                                                                  "metawiki", "mediawikiwiki",
-                                                                                  "wikidatawiki", "sourceswiki")]
             conn.execute("INSERT OR REPLACE INTO attribute(concept_id, key, value, source_sha512) VALUES (?,?,?,?)",
-                         (f"wd/{qid}", "sitelinks", str(sum(1 for k in wikis if k not in BOT_WIKIS)), digest))
+                         (f"wd/{qid}", "sitelinks", str(len(wikipedia_editions(sitelinks))), digest))
             conn.execute("INSERT OR REPLACE INTO attribute(concept_id, key, value, source_sha512) VALUES (?,?,?,?)",
-                         (f"wd/{qid}", "sitelinks_all", str(len(wikis)), digest))
+                         (f"wd/{qid}", "sitelinks_all",
+                          str(len(wikipedia_editions(sitelinks, with_bot_editions=True))), digest))
             if "enwiki" in sitelinks:
                 conn.execute("INSERT OR REPLACE INTO attribute(concept_id, key, value, source_sha512)"
                              " VALUES (?,?,?,?)", (f"wd/{qid}", "enwiki", sitelinks["enwiki"]["title"], digest))
@@ -406,7 +411,7 @@ def import_entities(conn: sqlite3.Connection, corpus: CorpusFile, decisions: lis
 def import_decisions(conn: sqlite3.Connection, decisions: list[dict], seed_sha512: str) -> int:
     n = 0
     conn.execute("DELETE FROM mapping WHERE source_sha512 IN (SELECT sha512 FROM source WHERE kind = 'seed'"
-                 " AND name = 'seed/crosswalk/acat-wikidata.tsv')")
+                 " AND (name = 'seed/crosswalk/acat-wikidata.tsv' OR name LIKE 'seed/reviews/%'))")
     for d in decisions:
         # 'unmatched' rows record that a concept was reviewed and nothing equivalent was found;
         # they are kept in the seed file as curation history but create no mapping
@@ -420,7 +425,7 @@ def import_decisions(conn: sqlite3.Connection, decisions: list[dict], seed_sha51
             " method=excluded.method, status=excluded.status, reviewer=excluded.reviewer, note=excluded.note,"
             " source_sha512=excluded.source_sha512",
             (d["from"], d["to"], d["relation"], d["method"], d["status"], d["reviewer"] or None,
-             d["note"] or None, seed_sha512))
+             d["note"] or None, d.get("review_sha512") or seed_sha512))
         n += 1
     return n
 

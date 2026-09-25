@@ -221,6 +221,11 @@ def _print_baseline_audit(b: dict | None) -> None:
     at = b["attention"]
     print(f"\nAttention: median Wikipedia editions {at['median']} without {'/'.join(at['excluded_editions'])}"
           f" ({at['median_all']} with them); {at['concepts_with_bot_editions']} concepts change")
+    ev = b.get("evidence")
+    if ev:
+        print(f"\nEvidence: {ev['all']['sourced']} of {ev['all']['statements']} current Wikidata statements cite a"
+              f" source; hierarchy statements: {ev['hierarchy']['sourced']} of {ev['hierarchy']['statements']}"
+              f" ({ev['definition']})")
     print("\nWho decided the accepted crosswalks:")
     for kind, rels in b["review"]["accepted_by_decider"].items():
         print(f"  {kind:32s} " + ", ".join(f"{k} {v}" for k, v in sorted(rels.items())))
@@ -307,6 +312,80 @@ def cmd_compendium_md(args) -> int:
     from .docs import write_compendium_md
     n = write_compendium_md(_ro(args), Path(args.out))
     print(f"wrote {args.out}: {n} concepts")
+    return 0
+
+
+def _wikidata_descriptions(qids: set[str]) -> dict[str, tuple[str, int]]:
+    """English description and Wikipedia-edition count of Wikidata items, from the latest entities corpus."""
+    from .build import latest_corpus
+    from .sources.wikidata import wikipedia_editions
+    ents = latest_corpus("wikidata-entities")
+    out: dict[str, tuple[str, int]] = {}
+    if ents is None:
+        return out
+    for it in ents.items():
+        if it["name"].startswith("entities/"):
+            for qid, e in json.loads(ents.get(it["name"])).get("entities", {}).items():
+                if qid in qids:
+                    desc = e.get("descriptions", {}).get("en", {}).get("value", "")
+                    out[qid] = (desc, len(wikipedia_editions(e.get("sitelinks", {}))))
+    return out
+
+
+def cmd_review(args) -> int:
+    from . import review
+    from .sources import wikidata
+    decisions = wikidata.read_decisions()
+    files, problems = review.read_reviews()
+    if problems:
+        print("review files are invalid:\n  " + "\n  ".join(problems), file=sys.stderr)
+        return 2
+    if args.action != "queue":
+        if not args.reviewer:
+            print("acat review: --reviewer is required (the person deciding)", file=sys.stderr)
+            return 2
+        if not any(d["from"] == args.frm and d["to"] == args.to for d in decisions):
+            print(f"acat review: no proposal {args.frm} -> {args.to} in {wikidata.DECISIONS.name}", file=sys.stderr)
+            return 2
+        try:
+            path = review.append(args.reviewer, review.mapping_target(args.frm, args.to), args.action,
+                                 relation=args.relation or "", kind="agent" if args.agent else "human",
+                                 perspective=args.perspective or "", rationale=args.rationale or "")
+        except review.SeedError as exc:
+            print(f"acat review: {exc}", file=sys.stderr)
+            return 2
+        print(f"recorded in {path.relative_to(Path.cwd()) if path.is_relative_to(Path.cwd()) else path};"
+              " run `acat build` to apply it")
+        return 0
+    reviewed = {r["target"] for sf in files for r in sf.rows if r["reviewer_kind"] == "human"}
+    pending = [d for d in decisions if d["status"] == "accepted" and d["to"]
+               and review.reviewer_kind(d["reviewer"]) == "AI agent"
+               and review.mapping_target(d["from"], d["to"]) not in reviewed
+               and (not args.relation or d["relation"] == args.relation)]
+    conn = _ro(args)
+    if args.under:
+        sub = {r[0] for r in conn.execute(
+            "WITH RECURSIVE s(id) AS (SELECT ? UNION SELECT b.child FROM broader b JOIN s ON b.parent = s.id)"
+            " SELECT id FROM s", (args.under,))}
+        pending = [d for d in pending if d["from"] in sub]
+    order = {"exactMatch": 0, "closeMatch": 1}
+    pending.sort(key=lambda d: (order.get(d["relation"], 2), d["from"]))
+    total_ai = sum(1 for d in decisions if review.reviewer_kind(d["reviewer"]) == "AI agent" and d["status"] == "accepted")
+    print(f"{len(pending)} AI decisions await a person ({total_ai - len(pending)} of {total_ai} reviewed)."
+          " exactMatch first: it is transitive, so one wrong link spreads.\n")
+    shown = pending[:args.limit]
+    wd = _wikidata_descriptions({d["to"][3:] for d in shown if d["to"].startswith("wd/")})
+    for i, d in enumerate(shown, 1):
+        ours = conn.execute("SELECT label, coalesce(scope_note, '') FROM concept WHERE id = ?", (d["from"],)).fetchone()
+        theirs = conn.execute("SELECT label FROM concept WHERE id = ?", (d["to"],)).fetchone()
+        desc, editions = wd.get(d["to"][3:], ("", 0))
+        print(f"[{i}] {d['relation']}  {d['from']} \"{ours[0] if ours else '?'}\"  ->  {d['to']}"
+              f" \"{theirs[0] if theirs else '?'}\"")
+        if ours and ours[1]:
+            print(f"      ours:     {ours[1][:150]}")
+        print(f"      Wikidata: {desc[:150] or '(no English description)'}; {editions} Wikipedia editions")
+        print(f"      proposed by {d['reviewer']} via {d['method']}" + (f": {d['note']}" if d["note"] else ""))
+        print(f"      acat review approve {d['from']} {d['to']} --reviewer \"<your name>\"\n")
     return 0
 
 
@@ -429,6 +508,19 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("compendium-md", help="write the compendium as Markdown")
     p.add_argument("out", nargs="?", default="docs/COMPENDIUM.md")
     p.set_defaults(fn=cmd_compendium_md)
+
+    p = sub.add_parser("review", help="human review of machine-proposed crosswalks (seed/reviews/)")
+    p.add_argument("action", choices=["queue", "approve", "revise", "object"])
+    p.add_argument("frm", nargs="?", metavar="from", help="our concept, e.g. acat/physics")
+    p.add_argument("to", nargs="?", help="the mapped concept, e.g. wd/Q413")
+    p.add_argument("--reviewer", help="the person deciding (their file is seed/reviews/<name>.tsv)")
+    p.add_argument("--relation", help="revise: the relation it should have; queue: only this relation")
+    p.add_argument("--perspective", help="your declared perspective, tradition or region (optional)")
+    p.add_argument("--rationale", help="why (required to revise or object)")
+    p.add_argument("--agent", action="store_true", help="the reviewer is an AI agent (recorded, never decisive)")
+    p.add_argument("--under", help="queue: only concepts under this one")
+    p.add_argument("-n", "--limit", type=int, default=10)
+    p.set_defaults(fn=cmd_review)
 
     p = sub.add_parser("fetch", help="fetch a source into a new dated, sealed corpus")
     p.add_argument("source", choices=["m49", "external", "wikidata", "wikidata-statements", "wikipedia",

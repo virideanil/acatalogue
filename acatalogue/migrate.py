@@ -8,7 +8,8 @@ import sqlite3
 from . import ledger
 from .util import sha512_bytes
 
-LATEST = 3
+LATEST = 4
+DERIVED_VIEWS = ("v_claim_current", "v_claim_truthy", "v_claim_evidence")
 
 
 def _has_table(conn: sqlite3.Connection, name: str) -> bool:
@@ -33,7 +34,29 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
     if version < 3:
         _v2_to_v3(conn)
         done.append("2->3")
+    if version < 4:
+        _v3_to_v4(conn)
+        done.append("3->4")
     return done
+
+
+def _v3_to_v4(conn: sqlite3.Connection) -> None:
+    """v4: a review can carry the relation a revision asks for."""
+    conn.execute("BEGIN")
+    try:
+        n = 0
+        if _has_table(conn, "review"):           # older databases get the whole table from schema.sql
+            if "relation" not in {r[1] for r in conn.execute("PRAGMA table_info(review)")}:
+                conn.execute("ALTER TABLE review ADD COLUMN relation TEXT")
+            n = conn.execute("SELECT count(*) FROM review").fetchone()[0]
+        ledger.record(conn, "acat migrate", "migrate-schema", target="schema",
+                      detail={"from": 3, "to": 4, "review_columns_added": ["relation"], "reviews": n},
+                      undo="restore the database file from before the migration, or rebuild it from seed/ and corpora/")
+        conn.execute("PRAGMA user_version = 4")
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
 
 
 def _v2_to_v3(conn: sqlite3.Connection) -> None:
@@ -73,6 +96,8 @@ def _v1_to_v2(conn: sqlite3.Connection) -> None:
     try:
         for trig in ("passage_ai", "passage_ad", "passage_au"):
             conn.execute(f"DROP TRIGGER IF EXISTS {trig}")
+        for view in DERIVED_VIEWS:                   # views name the tables rebuilt below; schema.sql recreates them
+            conn.execute(f"DROP VIEW IF EXISTS {view}")
         for t in ("concept_tri", "label_tri", "passage_tri", "label_fts", "concept_fts", "passage_fts"):
             conn.execute(f"DROP TABLE IF EXISTS {t}")
 

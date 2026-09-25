@@ -10,7 +10,7 @@ import sqlite3
 from collections import defaultdict, deque
 from pathlib import Path
 
-from . import audit, compendium, ledger
+from . import audit, compendium, ledger, review
 from .corpusfile import CORPORA_DIR, CorpusFile
 from .db import DEFAULT_DB, connect, init_schema
 from .sources import external, m49, wikidata, wikipedia, worldbank
@@ -164,7 +164,13 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
                                   "unverified": rep["unverified"]}
             say(f"external captions ({c.name}): {report['external']}")
 
-        decisions = wikidata.read_decisions()
+        review_files, review_problems = review.read_reviews()
+        if review_problems:
+            raise compendium.SeedError("review files are invalid:\n  " + "\n  ".join(review_problems))
+        for sf in review_files:
+            compendium.upsert_source_seed(conn, sf)
+        # the crosswalk holds the proposals; the latest human review of each one decides its effective state
+        decisions = review.apply_to_decisions(wikidata.read_decisions(), review_files)
         if decisions:
             sf = compendium.read_tsv(wikidata.DECISIONS, wikidata.DECISION_COLUMNS)
             compendium.upsert_source_seed(conn, sf)
@@ -191,6 +197,9 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
                            "facets_dangling": link["facets_dangling"],
                            "mappings_dangling": link["mappings_dangling"]}
         say(f"facets/mappings: {report['links']}")
+        report["reviews"] = review.load(conn, review_files, ACTOR)
+        if report["reviews"]["files"]:
+            say(f"reviews: {report['reviews']}")
 
         report["search"] = rebuild_search(conn)
         report["stats"] = compute_stats(conn)

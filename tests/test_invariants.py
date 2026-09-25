@@ -123,12 +123,17 @@ class MigrationTests(unittest.TestCase):
         conn.commit()
         # make it a v2 database: the claim table without the day-bound columns
         cols = [r[1] for r in conn.execute("PRAGMA table_info(claim)") if r[1] not in ("valid_from_day", "valid_to_day")]
-        conn.executescript(f"""
+        from acatalogue.migrate import DERIVED_VIEWS
+        conn.executescript("".join(f"DROP VIEW {v};" for v in DERIVED_VIEWS) + f"""
             CREATE TABLE claim_old AS SELECT {', '.join(cols)} FROM claim;
             DROP TABLE claim; ALTER TABLE claim_old RENAME TO claim; PRAGMA user_version = 2;""")
-        self.assertEqual(migrate(conn), ["2->3"])
+        conn.execute("DROP TABLE review")                     # v2 had no review table
+        conn.commit()
+        self.assertEqual(migrate(conn), ["2->3", "3->4"])
         self.assertIn("valid_from_day", [r[1] for r in conn.execute("PRAGMA table_info(claim)")])
         self.assertEqual(conn.execute("SELECT count(*) FROM claim").fetchone()[0], 3)
-        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 3)
-        self.assertEqual(conn.execute("SELECT count(*) FROM ledger WHERE action = 'migrate-schema'").fetchone()[0], 1)
+        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
+        self.assertEqual(conn.execute("SELECT count(*) FROM ledger WHERE action = 'migrate-schema'").fetchone()[0], 2)
+        dbm.init_schema(conn)                                  # and schema.sql then creates what is missing
+        self.assertIn("relation", [r[1] for r in conn.execute("PRAGMA table_info(review)")])
         self.assertEqual(migrate(conn), [], "a migrated database needs nothing more")
