@@ -14,8 +14,15 @@ A curated, attributed catalogue of knowledge. Read `docs/DESIGN.md` before chang
   documents are superseded.
 - A machine's proposal (e.g. a Wikidata match) is recorded as a proposal: the crosswalk's `reviewer`
   column names who proposed it, including when that was a model. People's decisions go into
-  `seed/reviews/<name>.tsv` through `acat review approve|revise|object`, and the build applies them on
-  top. Never write a review in a person's name; an agent's review uses `--agent` and never decides.
+  `seed/reviews/<name>.tsv` through `acat review approve|revise|object --human`, and the build applies
+  them on top. Never write a review in a person's name; an agent's review uses `--agent` and never decides.
+- `seed/sources/*.tsv` is the reviewed source registry (what each open source is, who publishes it,
+  its licence, converter, scheme and identifiers). Research rows become registry rows through
+  `research_notes/Open knowledge sources registry/curate.py`; every row names its reviewer.
+- The local store (`store/`, or `$ACAT_STORE`; gitignored) holds downloads, their sealed manifests
+  (`store/corpora/`) and converted lean files (`store/lean/`). Never edit them: a newer download is a
+  new dated snapshot. `acat build` integrates the store's selection; a source's own links enter the
+  catalogue as *proposed* mappings, never accepted ones.
 - Fetchers pass a response check (`fetch.py`): an error body is never sealed as data.
 - Evaluations do not go into scope notes; they are claims with a source and an epistemic status.
 
@@ -33,3 +40,5 @@ changing `viz/src/`. After changing the physics (the modules listed in `acatalog
 
 Optional, heavier: `./bin/acat embed` (dense label vectors; needs onnxruntime, tokenizers and the
 pinned model, verified by SHA-256) and `./bin/acat eval` (leave-one-language-out retrieval evaluation).
+Sources: `./bin/acat sources list|presets|select|plan|run|status|search|term` (downloads, so network);
+with a store present, `acat build` also integrates its converted sources and takes longer.

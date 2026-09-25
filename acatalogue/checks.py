@@ -41,35 +41,65 @@ def database_checks(conn: sqlite3.Connection) -> list[str]:
     return problems
 
 
-def skos_checks(conn: sqlite3.Connection) -> dict[str, list]:
+def integrated_schemes(conn: sqlite3.Connection) -> set[str]:
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'v_lean_source'").fetchone():
+        return set()
+    return {r[0] for r in conn.execute("SELECT scheme FROM v_lean_source WHERE mode <> 'removed'")}
+
+
+def skos_checks(conn: sqlite3.Connection, *, sources: bool = False) -> dict[str, list]:
+    """Violations in the catalogue's own schemes, or (sources=True) in the integrated sources' own data.
+    Each check stops at 50 violations, counted separately for each side so neither hides the other."""
+    integrated = integrated_schemes(conn)
+    conn.execute("DROP TABLE IF EXISTS temp._integrated")
+    conn.execute("CREATE TEMP TABLE _integrated(scheme TEXT PRIMARY KEY)")
+    conn.executemany("INSERT INTO temp._integrated VALUES (?)", [(x,) for x in sorted(integrated)])
+    side = "IN" if sources else "NOT IN"
+    of = f"substr({{col}}, 1, instr({{col}}, '/') - 1) {side} (SELECT scheme FROM temp._integrated)"
+
+    def mine(cid: str) -> bool:
+        return (cid.split("/", 1)[0] in integrated) == sources
     out: dict[str, list] = {}
     out["S13 pref/alt disjoint"] = [tuple(r) for r in conn.execute(
         "SELECT a.concept_id, a.lang, a.text FROM label a JOIN label b ON b.concept_id = a.concept_id"
-        " AND b.lang = a.lang AND b.text = a.text WHERE a.kind = 'pref' AND b.kind = 'alt' LIMIT 50")]
+        " AND b.lang = a.lang AND b.text = a.text WHERE a.kind = 'pref' AND b.kind = 'alt' AND "
+        + of.format(col="a.concept_id") + " LIMIT 50")]
     out["S14 one pref per language"] = [tuple(r) for r in conn.execute(
-        "SELECT concept_id, lang, count(*) FROM label WHERE kind = 'pref' GROUP BY concept_id, lang"
-        " HAVING count(*) > 1 LIMIT 50")]
+        "SELECT concept_id, lang, count(*) FROM label WHERE kind = 'pref' AND " + of.format(col="concept_id")
+        + " GROUP BY concept_id, lang HAVING count(*) > 1 LIMIT 50")]
     parents: dict[str, set[str]] = defaultdict(set)
     for child, parent in conn.execute("SELECT child, parent FROM broader"):
         parents[child].add(parent)
+    memo: dict[str, frozenset[str]] = {}
 
-    def ancestors(c: str) -> set[str]:
+    def ancestors(c: str) -> frozenset[str]:
+        """All ancestors (memoized; a cycle in a source's hierarchy ends the walk, never loops it)."""
+        if c in memo:
+            return memo[c]
         seen, stack = set(), list(parents.get(c, ()))
         while stack:
             x = stack.pop()
             if x not in seen:
                 seen.add(x)
-                stack.extend(parents.get(x, ()))
-        return seen
-
-    out["S27 related vs broaderTransitive"] = [
-        (a, b) for a, b in conn.execute("SELECT a, b FROM related") if b in ancestors(a) or a in ancestors(b)][:50]
+                if x in memo:
+                    seen |= memo[x]
+                else:
+                    stack.extend(parents.get(x, ()))
+        memo[c] = frozenset(seen)
+        return memo[c]
+    out["S27 related vs broaderTransitive"] = []
+    for a, b in conn.execute("SELECT a, b FROM related"):
+        if mine(a) and (b in ancestors(a) or a in ancestors(b)):
+            out["S27 related vs broaderTransitive"].append((a, b))
+            if len(out["S27 related vs broaderTransitive"]) >= 50:
+                break
     rel: dict[tuple[str, str], set[str]] = defaultdict(set)
     for f, t, r in conn.execute("SELECT from_id, to_id, relation FROM mapping WHERE status = 'accepted'"):
-        rel[tuple(sorted((f, t)))].add(r)
+        if mine(f):
+            rel[tuple(sorted((f, t)))].add(r)
     out["S46 exactMatch vs broad/related"] = [
-        (k, sorted(v)) for k, v in rel.items() if "exactMatch" in v and v & {"broadMatch", "relatedMatch"}][:50]
-    out["unique notation per scheme"] = [tuple(r) for r in conn.execute(
-        "SELECT scheme, notation, count(*) FROM concept WHERE notation IS NOT NULL AND status = 'active'"
-        " GROUP BY scheme, notation HAVING count(*) > 1 LIMIT 50")]
+        (k[0], k[1], sorted(v)) for k, v in rel.items() if "exactMatch" in v and v & {"broadMatch", "relatedMatch"}][:50]
+    out["unique notation per scheme"] = [(f"{r[0]}/", r[1], r[2]) for r in conn.execute(
+        "SELECT scheme, notation, count(*) FROM concept WHERE notation IS NOT NULL AND status = 'active' AND scheme "
+        + side + " (SELECT scheme FROM temp._integrated) GROUP BY scheme, notation HAVING count(*) > 1 LIMIT 50")]
     return out

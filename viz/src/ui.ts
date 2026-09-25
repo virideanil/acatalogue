@@ -761,6 +761,24 @@ export class Ui {
         return ul;
       }, rec.mappings.length > 0 && rec.mappings.length <= 6),
     );
+    if (rec.sources.length > 0) {
+      parts.push(
+        this.collapsible("In other sources", rec.sources.length, () => {
+          const ul = h("ul", "rows");
+          for (const x of rec.sources) {
+            const li = h("li");
+            const b = h("button", "link", x.label);
+            b.type = "button";
+            b.dataset.id = x.id;
+            li.append(b, h("span", "meta", ` ${x.id} · ${x.scheme_title}`));
+            const how = x.via ? `through ${x.via}, ${x.method.replace(/^declared:/, "declared by ")}` : x.method.replace(/^declared:/, "declared by ");
+            li.append(h("p", "meta", `${x.relation}, ${x.status}: ${how}`));
+            ul.append(li);
+          }
+          return ul;
+        }, rec.sources.length <= 8),
+      );
+    }
     if (rec.reviews.length > 0) {
       parts.push(
         this.collapsible("Reviews", rec.reviews.length, () => {

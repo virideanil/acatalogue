@@ -33,7 +33,36 @@ def cmd_sources(args) -> int:
         print("the registry has problems:\n  " + "\n  ".join(reg.problems[:30]), file=sys.stderr)
         return 2
     return {"list": _list, "show": _show, "presets": _presets, "select": _select, "deselect": _deselect,
-            "add": _add, "plan": _plan, "run": _run, "status": _status, "verify": _verify}[args.action](args, store, reg)
+            "add": _add, "plan": _plan, "run": _run, "status": _status, "verify": _verify, "search": _search,
+            "term": _term}[args.action](args, store, reg)
+
+
+def _search(args, store, reg) -> int:
+    from . import db as dbm
+    from .leansearch import search
+    if not args.ids:
+        print("acat sources search <words>", file=sys.stderr)
+        return 2
+    conn = dbm.connect(args.db, readonly=True)
+    hits = search(conn, " ".join(args.ids), schemes=args.scheme.split(",") if args.scheme else None,
+                  limit=args.limit)
+    for h in hits:
+        extra = f"  ({h['kind']} {h['lang'] or '-'}: {h['matched']})" if h["matched"] != h["label"] else ""
+        print(f"{h['id']:36s} {h['label']}{extra}  [{h['mode']}]")
+    return 0 if hits else 1
+
+
+def _term(args, store, reg) -> int:
+    from . import db as dbm
+    from .leansearch import record
+    conn = dbm.connect(args.db, readonly=True)
+    for ident in args.ids:
+        rec = record(conn, ident)
+        if rec is None:
+            print(f"{ident}: not in any integrated source", file=sys.stderr)
+            return 1
+        print(json.dumps(rec, ensure_ascii=False, indent=2))
+    return 0
 
 
 def _list(args, store, reg) -> int:
@@ -236,7 +265,8 @@ def _verify(args, store, reg) -> int:
 def add_parser(sub) -> None:
     p = sub.add_parser("sources", help="choose open sources (or add your own), download, convert and integrate them")
     p.add_argument("action", choices=["list", "show", "presets", "select", "deselect", "add", "plan", "run", "status",
-                                      "verify"])
+                                      "verify", "search", "term"])
+    p.add_argument("-n", "--limit", type=int, default=20, help="search: hits per source")
     p.add_argument("ids", nargs="*", help="source ids or preset:<name>")
     p.add_argument("--store", type=Path, help="the local store (default: $ACAT_STORE or ./store)")
     p.add_argument("--preset", help="list: only this preset's sources")
@@ -255,5 +285,6 @@ def add_parser(sub) -> None:
     p.add_argument("--options", help="add: the converter's options as JSON")
     for k in ("title", "publisher", "perspective", "license", "homepage", "languages", "domains", "scheme",
               "iri-prefixes", "notes"):
-        p.add_argument(f"--{k}", help=f"add: the source's {k.replace('-', ' ')}")
+        p.add_argument(f"--{k}", help=f"add: the source's {k.replace('-', ' ')}"
+                       + ("; search: only these schemes (comma-separated)" if k == "scheme" else ""))
     p.set_defaults(fn=cmd_sources)

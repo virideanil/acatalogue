@@ -73,3 +73,56 @@ live in Chromium against the API, screenshots checked); an independent reviewer 
   the report, not needed at today's size, not built.
 - **Language-region diversity per concept and label coverage against speaker shares** (report 3.5,
   second half) need a language → region table with a source; not built.
+
+## The third request, verbatim (2026-09-25)
+
+> use all of those sources as well as a lot more (selectable by user to add to their starting point
+> too) to then naturally download and meanwhile make ready of the systems and unpack our structure as
+> pristinely ready to integrate those downloaded databases (perfectly orderedfully ıntegrated to sql,
+> with perfect structuring.) converted to ensure made lean and gotten most semantic info while also
+> making it local.
+
+## Dispositions of the third request
+
+Research first: four researchers checked 142 candidate sources live on 2026-09-25 (URL, size, licence,
+languages, perspective). Their rows, and the script that curated them into the registry, are in
+`research_notes/Open knowledge sources registry/`. Then the machinery, then a real run of the starter
+preset into this machine's catalogue.
+
+| D | Part of the request | Disposition | Receipt |
+|---|---|---|---|
+| D1 | "naturally download" | **Built and run.** Resumable downloads (HTTP Range with If-Range), SHA-512 computed while streaming, publisher checksums checked (a file that fails is kept aside, never sealed), one connection per host, 429/503 waited out. Each source's files are sealed as a dated manifest that `acat verify` re-hashes. | `tests/test_download.py` (10); starter run: 21 sources, 336 MB downloaded and sealed |
+| D1 | "perfectly ordered, integrated to SQL, with perfect structuring" | **Built and run.** One lean layout for every source (terms in source order, interned languages and predicates, one direction per relation, typed attributes). Integration records provenance: every raw file and lean file by SHA-512, each integration in `lean_integration`, and one ledger row per integration. A new version supersedes the old one; deselecting retires a source; nothing is deleted. | `tests/test_convert.py` (13; the same vocabulary gives the same lean content in N-Triples, RDF/XML and Turtle; the same bytes give the same file); `tests/test_sources.py` (10, end to end into a real build); real counts match the publishers' (Glottolog 27,177 − 380 bookkeeping = 26,797; GCMD 3,780; IANA 9,296; OEWN hypernymy 93,395) |
+| D2 | "use all of those sources as well as a lot more" | **Registered: 129 sources.** 45 are recommended and 21 make up the starter preset. The rest are listed with the reason they are not recommended: a licence (non-commercial, no derivatives), access (a login, a form, a blocked site), size, or the need to consult the community that governs them. | `seed/sources/registry.tsv`; `acat sources list` |
+| D2 | "selectable by user to add to their starting point too" | **Built.** 8 presets; `select` and `deselect`; `add` for sources of your own (a URL, or a file on your machine: a SQLite database is copied through the backup API) with a declared column mapping. | `acat sources add …`; `test_a_users_own_file` |
+| D3 | "gotten most semantic info" | **Built.** The layout keeps: names in every language and of every kind (hidden, broader, narrower and related names); typed relations; definitions and notes; outward links. Links resolve across sources through the registry's identifier prefixes, with Wikidata as the hub. Wordnets are keyed by the Interlingual Index. | Starter: 385,565 concepts, 2,773,359 names in 1,135 languages, 403,194 broader edges, 69,449 proposed mappings (1,137 through Wikidata's identifiers) |
+| D3 | "made lean" | **Built and measured.** Nothing is stored twice: inverses are folded, symmetric relations stored once, derivable siblings dropped. Every drop is counted in the file. | Starter lean files: 343 MB with word indexes, against 1,465 MB of uncompressed downloads (336 MB compressed) |
+| D4 | "while also making it local" | **Built.** The store, the catalogue and the search all run on this machine. Once downloaded, nothing needs the network. | `store/` (or `$ACAT_STORE`); `acat sources search` reads lean files in place |
+| D4 | "meanwhile make ready of the systems" | **Built.** The stages overlap: downloads run in threads, conversion runs in processes as each source lands, and each source is integrated as soon as it is converted. | the starter run's log: conversions began while GeoNames' 205 MB of names were still downloading |
+| D5 | the catalogue's surfaces | **Built.** The inspector lists "In other sources" for a concept, and attached terms open in place. | `/api/sources`, `/api/sources/search`, `/api/sources/record`; viz tests 26 |
+
+### Not done, and why
+
+- **PubChem's periodic table.** For 15 minutes PubChem's front end answered this Python client with 503
+  and Retry-After, while curl, with the same User-Agent, got 200. The refusal is respected: the source
+  is out of the starter, and a hand-downloaded copy can be added with `acat sources add --path`.
+- **70 registered sources have no converter yet** (`raw`). They download and seal, and wait for a
+  converter. Candidates by value: Glottolog CLDF and WALS, Pleiades, Natural Earth, UN WPP (as claims
+  on the M49 places), Wiktionary extracts, ConceptNet.
+- **Licence checks for the owner.** UDC Summary moved to CC BY-NC 4.0 in 2026, and OCLC's terms limit
+  storing DDC. The catalogue already quotes ten main-class captions of each; someone with authority
+  should decide.
+- **Consent before ingest.** Māori subject headings (Ngā Upoko Tukutuku), the Brian Deer classification
+  (Xwi7xwa) and AIATSIS thesauri are listed without files. Their communities come first.
+- **Regional gap.** The research found no open subject system published from Africa, the Arab world
+  or South Asia. DeCS (Latin America) needs a licence agreement. The starter's publishers are mostly in
+  the USA and Europe, with two Japanese institutions (NDL, JLA) and several international bodies.
+- **Turkish dotted capital İ.** The word index keeps combining marks inside words (Devanagari and Tamil
+  need that), so "İstanbul" does not match "istanbul" in words search. Substring search folds it
+  correctly.
+- **Build time.** With the starter integrated, `acat build` rebuilds the search indexes over 2.8
+  million names, which takes minutes rather than 9 s. Attach mode keeps large sources out of the
+  catalogue.
+- **A privacy incident, reported plainly.** One researcher's first request to the Wikidata API
+  carried the owner's e-mail address in its User-Agent, against the owner's instruction. Every later
+  request, and every request the downloader makes, names only the project.

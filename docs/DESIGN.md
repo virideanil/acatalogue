@@ -350,3 +350,65 @@ Wikipedia language editions cover each concept — the bias view, made visible.
 
 At every stage the same five disciplines hold: exact bytes with SHA-512, named sealed corpora,
 reviewed text for decisions, a rebuildable database, and a hash-chained ledger.
+
+## 9. Sources: choosing them, fetching them, making them one structure
+
+The catalogue grows by taking in whole open sources: thesauri, classifications, ontologies,
+gazetteers and code lists. Each goes through the same five steps, and each step leaves a record.
+
+1. **Chosen from a registry that shows where each source comes from.** `seed/sources/registry.tsv`
+   lists 129 sources. Four researchers checked every URL live on 2026-09-25, together with its size,
+   licence, languages and caveats. Every row says who publishes the source and from where (its
+   *perspective*), which converter reads it, which catalogue scheme it becomes, and how its
+   identifiers look. The registry also keeps the sources that cannot be fetched: restricted,
+   non-commercial, behind a form, or governed by a community whose consent comes first (Māori
+   subject headings, the Brian Deer classification, AIATSIS). Listing them keeps the gaps visible.
+   Presets are starting points; `starter` covers every domain in about 330 MB. A user adds sources
+   of their own, including files on their machine (`acat sources add --path …`). These sit beside
+   the reviewed entries and never replace them.
+2. **Downloaded politely and verified at the byte boundary** (`download.py`):
+   - resumable with HTTP Range, guarded by If-Range, so a file that changed on the server starts
+     over instead of being spliced;
+   - SHA-512 computed while the bytes stream, and the publisher's own checksum checked when there
+     is one;
+   - one connection per host with pauses between requests, and 429/503 waited out;
+   - local SQLite files copied through SQLite's backup API, so a database that is in use is copied
+     consistently.
+3. **Sealed as a manifest.** Once a source's files are in, a dated corpus in the local store records
+   each file's SHA-512, size, URL, time and licence. The bytes stay beside it as external items, and
+   `acat verify` re-hashes them.
+4. **Converted to one lean layout** (`lean.py`, `convert/`). Every source becomes the same compact
+   SQLite shape: terms in the source's own order, interned languages and predicates, names by kind,
+   relations stored in one direction only, typed attributes and outward links. The converters read
+   the publishers' own formats as streams:
+   - SKOS, SKOS-XL and OWL in N-Triples, RDF/XML or Turtle; a test proves the same vocabulary gives
+     the same lean content in all three;
+   - OBO;
+   - WordNet LMF, keyed by the Interlingual Index, so every wordnet's words for one meaning meet on
+     one term;
+   - GeoNames, CLDR, the IANA subtag registry, PeriodO, MeSH, OpenAlex, ROR, NCBI Taxonomy and a
+     Wikidata dump filter;
+   - any CSV or SQLite file, through a declared column mapping.
+
+   Lean means nothing is stored twice: narrower is turned into broader, symmetric relations are
+   stored once, and siblings that the hierarchy already implies are dropped. Every relation or name
+   that could not be placed is counted.
+5. **Integrated, with provenance, in one of two modes** (`integrate.py`):
+   - *full*: every term becomes a concept `<scheme>/<code>`, with its names (hidden names kept
+     hidden), hierarchy, kind facets and attributed claims;
+   - *attach*: very large sources stay in their lean files, where `acat sources search` and
+     `/api/sources/*` read them in place.
+
+   **Links between sources** resolve through the registry's identifier prefixes. Wikidata is the
+   hub: its identifier statements (GeoNames P1566, MeSH P486, …) map items to the sources' concepts.
+   The value templates for those statements were checked against the catalogue's own statements.
+
+   **Declared links stay proposed.** A mapping that a source declares is that source's claim. It is
+   recorded as *proposed* and waits for a person's review, like every machine proposal here.
+
+   **Nothing is lost on update or removal.** A newer version supersedes the previous one's claims.
+   Deselecting a source deprecates its concepts and supersedes its claims; nothing is deleted.
+
+The whole run is one command, `acat sources run`, and its stages overlap: downloads run in parallel,
+each source is converted in a worker process as soon as its files land, and each converted source
+is integrated immediately by the catalogue's single writer.

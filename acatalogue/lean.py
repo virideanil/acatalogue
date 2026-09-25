@@ -260,9 +260,9 @@ class LeanWriter:
         counts["deprecated"] = c.execute("SELECT count(*) FROM term WHERE status = 1").fetchone()[0]
         self.dropped.update({"relations_subject_unknown": n_rel_in - n_resolved, "relations_self": self_loops,
                              "relations_kept_as_links": dangling})
-        meta = {**{k: v for k, v in self.meta.items() if v is not None}, "converted_at": utcnow(),
-                "counts": json.dumps(counts, sort_keys=True), "dropped": json.dumps(self.dropped, sort_keys=True),
-                "seconds": f"{time.monotonic() - self.t0:.1f}"}
+        # nothing time-dependent goes into the file: the same inputs read the same way give the same bytes
+        meta = {**{k: v for k, v in self.meta.items() if v is not None},
+                "counts": json.dumps(counts, sort_keys=True), "dropped": json.dumps(self.dropped, sort_keys=True)}
         c.executemany("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", sorted(meta.items()))
         c.execute("COMMIT")
         c.execute("ANALYZE")
@@ -270,7 +270,8 @@ class LeanWriter:
         c.close()
         os.replace(self.partial, self.path)
         digest, size = sha512_file(self.path)
-        return {"path": str(self.path), "sha512": digest, "bytes": size, "counts": counts, "dropped": self.dropped}
+        return {"path": str(self.path), "sha512": digest, "bytes": size, "counts": counts, "dropped": self.dropped,
+                "converted_at": utcnow(), "seconds": round(time.monotonic() - self.t0, 1)}
 
     def abort(self) -> None:
         try:

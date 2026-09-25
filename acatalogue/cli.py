@@ -304,6 +304,13 @@ def cmd_verify(args) -> int:
             for name, found in skos_checks(rw).items():
                 print(f"skos {name}: " + ("OK" if not found else f"{len(found)} violations, e.g. {found[:3]}"))
                 ok &= not found
+            for name, found in skos_checks(rw, sources=True).items():   # the sources' own data: a finding, not a fault
+                if found:
+                    per: dict[str, int] = {}
+                    for row in found:
+                        per[str(row[0]).split("/", 1)[0]] = per.get(str(row[0]).split("/", 1)[0], 0) + 1
+                    print(f"  in integrated sources' own data, {name}: "
+                          + ", ".join(f"{k} {v}" for k, v in sorted(per.items())) + (" (the first 50)" if len(found) >= 50 else ""))
         finally:
             rw.close()
     return 0 if ok else 1

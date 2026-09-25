@@ -15,6 +15,7 @@ store.sqlite (download, job, event); the catalogue's ledger records every integr
 from __future__ import annotations
 
 import concurrent.futures as cf
+import hashlib
 import json
 import multiprocessing
 import os
@@ -176,19 +177,25 @@ class Pipeline:
                     results[s]["sealed_only"] = True
                     return
                 from .convert import VERSION
+                recipe = hashlib.sha256(json.dumps([self.reg.sources[s]["converter"],
+                                                    json.loads(self.reg.sources[s].get("options") or "{}")],
+                                                   sort_keys=True).encode()).hexdigest()[:16]
+                key = f"{manifest}|{VERSION}|{recipe}"      # the same bytes, read the same way
                 job = self.store.conn.execute("SELECT * FROM job WHERE snapshot = ? AND stage = 'convert'",
                                               (snap,)).fetchone()
-                if job and job["state"] == "done" and job["input"] == f"{manifest}|{VERSION}" and \
+                if job and job["state"] == "done" and job["input"] == key and \
                         Path(self.store.abs(job["output"])).exists():
                     results[s]["lean"] = self.store.abs(job["output"])
                     self.say(f"  {s}: converted already ({Path(job['output']).name})")
                     return
-                out = self.store.lean_dir(s) / f"{snap}.sqlite"
+                # named by the reading too: another converter version or other options never overwrite a file
+                # an earlier integration names (the same reading gives the same bytes, so it may)
+                out = self.store.lean_dir(s) / f"{snap}-{VERSION}-{recipe[:8]}.sqlite"
                 self.store.conn.execute(
                     "INSERT INTO job(snapshot, stage, source, state, input, output, started_at) VALUES (?,?,?,?,?,?,?)"
                     " ON CONFLICT(snapshot, stage) DO UPDATE SET state = 'running', input = excluded.input,"
                     " started_at = excluded.started_at, error = NULL",
-                    (snap, "convert", s, "running", f"{manifest}|{VERSION}", self.store.rel(out), utcnow()))
+                    (snap, "convert", s, "running", key, self.store.rel(out), utcnow()))
                 self.say(f"  {s}: converting {snap} ({self.reg.sources[s]['converter']})")
                 fut = cpool.submit(convert_job, {"manifest_path": str(self.store.corpus_path(snap)),
                                                  "entry": dict(self.reg.sources[s]), "snapshot": snap,
@@ -231,12 +238,18 @@ class Pipeline:
                     futures.append((s, fut))
                 self.say(f"  {s}: {len(files)} file(s) queued into {self.store.rel(raw)}")
             started: set[str] = set()
+            integrated: set[str] = set()
             for s in sources:                             # sealed earlier: straight to conversion
                 if snaps[s][1]:
                     start_conversion(s)
                     started.add(s)
             try:
                 while True:
+                    if self.integrate_after:              # one writer: each ready source goes in now
+                        for s in sources:
+                            if s not in integrated and results[s].get("lean") is not None:
+                                integrated.add(s)
+                                self._integrate_ready(s, results)
                     for s in sources:
                         with self.lock:
                             ready = s not in started and pending_files.get(s) == 0
@@ -251,7 +264,9 @@ class Pipeline:
                     for fut in done:
                         s = conversions.pop(fut)
                         self._converted(s, snaps[s][0], fut, results)
-                    if len(started) == len(sources) and not conversions:
+                    if len(started) == len(sources) and not conversions and not (
+                            self.integrate_after and any(s not in integrated and results[s].get("lean") is not None
+                                                         for s in sources)):
                         break
                     if not conversions and not done:
                         cf.wait([f for _, f in futures], timeout=0.5, return_when=cf.FIRST_COMPLETED)
@@ -260,8 +275,46 @@ class Pipeline:
                 self.say("  interrupted: partial downloads stay as .part files and resume next time")
                 raise
         if self.integrate_after:
-            results["_integration"] = self.integrate([s for s in sources if results[s].get("lean")])
+            results["_integration"] = self._finish_integration()
         return results
+
+    # ── integration, one source at a time as each is ready ──
+    def _conn(self):
+        if getattr(self, "_cat", None) is None:
+            from . import db as dbm
+            self._cat = dbm.connect(self.db_path) if self.db_path else dbm.connect()
+            dbm.init_schema(self._cat)
+            self._integrated: dict[str, dict] = {}
+        return self._cat
+
+    def _integrate_ready(self, s: str, results: dict) -> None:
+        try:
+            out = self.integrate_one(self._conn(), s)
+        except Exception as exc:
+            err = "".join(traceback.format_exception_only(type(exc), exc)).strip()
+            results[s]["error"] = f"integrate: {err}"
+            self.store.event(s, "integrate", "error", err[:500])
+            self.say(f"  {s}: integration FAILED: {err}")
+            return
+        if out is not None:
+            self._integrated[s] = out
+
+    def _finish_integration(self) -> dict:
+        from .build import compute_stats, rebuild_search
+        conn = getattr(self, "_cat", None)
+        if conn is None:
+            return {}
+        try:
+            if any(not v.get("skipped") for v in self._integrated.values()):
+                conn.execute("BEGIN")
+                self.say("  rebuilding search indexes and statistics")
+                rebuild_search(conn)
+                compute_stats(conn)
+                conn.commit()
+        finally:
+            conn.close()
+            self._cat = None
+        return self._integrated
 
     def expand(self, s: str, snap: str, f: dict, raw: Path) -> list[Task]:
         """The part files a downloaded manifest names (OpenAlex: s3:// URLs served over HTTPS)."""
@@ -299,7 +352,8 @@ class Pipeline:
         self.store.conn.execute("UPDATE job SET state = 'done', output_sha512 = ?, finished_at = ?, detail = ?"
                                 " WHERE snapshot = ? AND stage = 'convert'",
                                 (res["sha512"], utcnow(), json.dumps({"counts": res["counts"], "dropped": res["dropped"],
-                                                                      "bytes": res["bytes"]}), snap))
+                                                                      "bytes": res["bytes"], "seconds": res["seconds"]}),
+                                 snap))
         for line in res.get("log", []):
             self.say(f"  {s}:{line}")
         self.store.event(s, "convert", "info", f"{snap}: {res['counts']}")
@@ -310,45 +364,35 @@ class Pipeline:
 
     # ── integrate ──
     def integrate(self, sources: list[str]) -> dict:
-        from . import db as dbm
-        from .build import compute_stats, rebuild_search
+        """Integrate these sources' latest lean files now (then rebuild the search indexes once)."""
+        for s in sources:
+            self._integrate_ready(s, {s: {}})
+        return self._finish_integration()
+
+    def integrate_one(self, conn, s: str) -> dict | None:
         from .integrate import Resolver, integrate
-        if not sources:
-            return {}
-        conn = dbm.connect(self.db_path) if self.db_path else dbm.connect()
-        dbm.init_schema(conn)
-        out = {}
-        resolver = Resolver(list(self.reg.sources.values()))
+        lean, snap, manifest = self.latest_lean(s)
+        if lean is None:
+            return None
+        if getattr(self, "_resolver", None) is None:
+            self._resolver = Resolver(list(self.reg.sources.values()))
         selected = self.store.selected()
+        mode = self.reg.mode(s, selected[s]["mode"] if s in selected else None)
+        self.say(f"  {s}: integrating ({mode})")
+        conn.execute("BEGIN")
         try:
-            for s in sources:
-                lean, snap, manifest = self.latest_lean(s)
-                if lean is None:
-                    continue
-                mode = self.reg.mode(s, selected[s]["mode"] if s in selected else None)
-                self.say(f"  {s}: integrating ({mode})")
-                conn.execute("BEGIN")
-                try:
-                    out[s] = integrate(conn, lean, self.reg.sources[s], snapshot=snap, manifest_sha512=manifest,
-                                       mode=mode, resolver=resolver, store_path=self.store.rel(lean), progress=self.say)
-                    conn.commit()
-                except BaseException:
-                    conn.rollback()
-                    raise
-                self.store.conn.execute(
-                    "INSERT INTO job(snapshot, stage, source, state, input, finished_at, detail) VALUES (?,?,?,?,?,?,?)"
-                    " ON CONFLICT(snapshot, stage) DO UPDATE SET state = 'done', input = excluded.input,"
-                    " finished_at = excluded.finished_at, detail = excluded.detail",
-                    (snap, "integrate", s, "done", out[s].get("lean_sha512"), utcnow(),
-                     json.dumps({k: v for k, v in out[s].items() if isinstance(v, (int, str))})))
-            if any(not v.get("skipped") for v in out.values()):
-                conn.execute("BEGIN")
-                self.say("  rebuilding search indexes and statistics")
-                rebuild_search(conn)
-                compute_stats(conn)
-                conn.commit()
-        finally:
-            conn.close()
+            out = integrate(conn, lean, self.reg.sources[s], snapshot=snap, manifest_sha512=manifest,
+                            mode=mode, resolver=self._resolver, store_path=self.store.rel(lean), progress=self.say)
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        self.store.conn.execute(
+            "INSERT INTO job(snapshot, stage, source, state, input, finished_at, detail) VALUES (?,?,?,?,?,?,?)"
+            " ON CONFLICT(snapshot, stage) DO UPDATE SET state = 'done', input = excluded.input,"
+            " finished_at = excluded.finished_at, detail = excluded.detail",
+            (snap, "integrate", s, "done", out.get("lean_sha512"), utcnow(),
+             json.dumps({k: v for k, v in out.items() if isinstance(v, (int, str))})))
         return out
 
     def latest_lean(self, s: str) -> tuple[Path | None, str | None, str | None]:

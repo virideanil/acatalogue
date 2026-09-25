@@ -1,26 +1,25 @@
 preset	source	note
-starter	oewn-2025-plus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	openalex-topics	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	schema-org	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	physh	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	lcgft	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	ndlsh	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	ndc9-jla	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	unesco-thesaurus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	gemet	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	stw	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	mesh-xml	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	geonames-cities15000	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	glottolog-languoid-csv	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	iana-language-subtag-registry	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	cldr-localenames-full	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	periodo-dataset	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	gene-ontology-basic	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	disease-ontology	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	environment-ontology	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	unified-astronomy-thesaurus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	gcmd-science-keywords	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
-starter	pubchem-periodic-table	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	oewn-2025-plus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	openalex-topics	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	schema-org	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	physh	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	lcgft	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	ndlsh	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	ndc9-jla	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	unesco-thesaurus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	gemet	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	stw	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	mesh-xml	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	geonames-cities15000	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	glottolog-languoid-csv	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	iana-language-subtag-registry	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	cldr-localenames-full	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	periodo-dataset	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	gene-ontology-basic	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	disease-ontology	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	environment-ontology	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	unified-astronomy-thesaurus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
+starter	gcmd-science-keywords	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 330 MB
 languages	iana-language-subtag-registry	Languages and their names
 languages	cldr-localenames-full	Languages and their names
 languages	glottolog-languoid-csv	Languages and their names

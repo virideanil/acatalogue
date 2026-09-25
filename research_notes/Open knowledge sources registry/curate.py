@@ -60,6 +60,7 @@ DECISIONS: dict[str, dict] = {
     "abstract-wikipedia": {"converter": "raw", "recommend": "no"},
     "wikifunctions": {"converter": "raw", "recommend": "no"},
     "dbpedia-ontology": {"converter": "rdf", "scheme": "dbpedia-ontology", "integrate": "full",
+                         "options": {"keep_prefix": "http://dbpedia.org/ontology/"},
                          "iri_prefixes": "http://dbpedia.org/ontology/", "recommend": "yes",
                          "files": [file("https://databus.dbpedia.org/ontologies/dbpedia.org/ontology/2024.08.01-180007/ontology_type=parsed.nt",
                                         "dbpedia-ontology.nt", 9858392,
@@ -103,7 +104,8 @@ DECISIONS: dict[str, dict] = {
     "crossref-public-data-2026": {"converter": "raw", "recommend": "no", "access": "blocked", "files": [],
                                   "why": "a torrent only (223 GB): no plain HTTPS copy"},
     "schema-org": {"converter": "rdf", "scheme": "schema-org", "integrate": "full", "recommend": "starter",
-                   "options": {"default_lang": "en"}, "iri_prefixes": "https://schema.org/ http://schema.org/"},
+                   "options": {"default_lang": "en", "keep_prefix": "https://schema.org/"},
+                   "iri_prefixes": "https://schema.org/ http://schema.org/"},
     "ror": {"converter": "ror", "scheme": "ror", "integrate": "attach", "recommend": "yes",
             "iri_prefixes": "https://ror.org/", "wikidata_property": "P6782",
             "files": [file("https://zenodo.org/records/22902037/files/v2.13-2026-09-22-ror-data.zip?download=1",
@@ -318,8 +320,11 @@ DECISIONS: dict[str, dict] = {
                        "kind": "Integer sequence", "facet": "kind/mathematical-object",
                        "labels": [{"column": 1, "lang": "en"}]}]}},
     "pubchem-periodic-table": {
-        "converter": "csv", "scheme": "elements", "integrate": "full", "recommend": "starter",
+        "converter": "csv", "scheme": "elements", "integrate": "full", "recommend": "yes",
         "title": "The chemical elements (PubChem periodic table)",
+        "why": "on 2026-09-25 PubChem's front end answered this Python client with 503 and Retry-After for "
+               "15 minutes while curl, with the same User-Agent, got 200; the refusal is respected: download "
+               "the CSV yourself and add it with `acat sources add --path`",
         "options": {"iri_template": "https://pubchem.ncbi.nlm.nih.gov/element/{code}", "tables": [{
             "code": "AtomicNumber", "kind": "Chemical element", "facet": "kind/substance",
             "labels": [{"column": "Name", "lang": "en"}, {"column": "Symbol", "lang": "", "kind": "alt"}],
@@ -351,7 +356,7 @@ GEONAMES_SIZES = {"cities15000.zip": 3359528, "cities5000.zip": 5707443, "cities
 
 PRESETS = {
     "starter": ("A small, open, varied starting point: every domain, many languages and several traditions "
-                "of ordering knowledge, about 340 MB", None),
+                "of ordering knowledge, about 330 MB", None),
     "languages": ("Languages and their names", ["iana-language-subtag-registry", "cldr-localenames-full",
                                                 "glottolog-languoid-csv", "oewn-2025-plus"]),
     "places-and-time": ("Places and periods", ["geonames-cities15000", "cldr-localenames-full", "periodo-dataset"]),

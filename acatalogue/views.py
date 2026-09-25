@@ -105,6 +105,7 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
                          " m.reviewer, m.note FROM mapping m JOIN concept c ON c.id = m.from_id WHERE m.to_id = ?"
                          " ORDER BY 1", (cid, cid))],
         "documents": documents, "claims": claims, "neighbors": neighbors, "attributes": attrs, "provenance": prov,
+        "sources": linked_sources(conn, cid),
         "reviews": [{"target": r[0], "reviewer": r[1], "reviewer_kind": r[2], "perspective": r[3], "decided_at": r[4],
                      "decision": r[5], "relation": r[6], "rationale": r[7]}
                     for r in conn.execute(
@@ -113,6 +114,72 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
                         " WHERE target = ? OR target LIKE ? OR target LIKE ? ORDER BY decided_at",
                         (f"concept:{cid}", f"mapping:{cid}|%", f"label:{cid}|%"))],
     }
+
+
+def linked_sources(conn: sqlite3.Connection, cid: str) -> list[dict]:
+    """Where this concept is in the integrated sources: through its reviewed mappings to Wikidata items
+    and the mappings those items have (Wikidata's identifier statements, the sources' own links), and
+    through its own mappings into integrated schemes. Every such link is labelled with how it was made."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'v_lean_source'").fetchone():
+        return []
+    integrated = {r[0]: r[1] for r in conn.execute("SELECT scheme, mode FROM v_lean_source WHERE mode <> 'removed'")}
+    if not integrated:
+        return []
+    hubs = [r[0] for r in conn.execute(
+        "SELECT to_id FROM mapping WHERE from_id = ? AND status = 'accepted' AND relation IN ('exactMatch', 'closeMatch')"
+        " AND to_id LIKE 'wd/%' ORDER BY to_id", (cid,))]
+    if cid.startswith("wd/"):
+        hubs.append(cid)
+    found: dict[str, dict] = {}
+
+    def add(other: str, relation: str, method: str, status: str, via: str | None) -> None:
+        scheme = other.split("/", 1)[0]
+        if scheme in integrated and other != cid and other not in found:
+            found[other] = {"id": other, "scheme": scheme, "relation": relation, "method": method, "status": status,
+                            "via": via, "mode": integrated[scheme]}
+    for w in hubs:
+        for to, rel, method, status in conn.execute(
+                "SELECT to_id, relation, method, status FROM mapping WHERE from_id = ? ORDER BY to_id", (w,)):
+            add(to, rel, method, status, w if w != cid else None)
+        for frm, rel, method, status in conn.execute(
+                "SELECT from_id, relation, method, status FROM mapping WHERE to_id = ? ORDER BY from_id", (w,)):
+            add(frm, rel, method, status, w if w != cid else None)
+    for to, rel, method, status in conn.execute("SELECT to_id, relation, method, status FROM mapping WHERE from_id = ?"
+                                                " ORDER BY to_id", (cid,)):
+        add(to, rel, method, status, None)
+    out = []
+    for rec in found.values():
+        row = conn.execute("SELECT label FROM concept WHERE id = ?", (rec["id"],)).fetchone()
+        label = row[0] if row else None
+        if label is None and rec["mode"] == "attach":
+            from .leansearch import record
+            r = record(conn, rec["id"])
+            label = r["label"] if r else None
+        title = conn.execute("SELECT title FROM scheme WHERE id = ?", (rec["scheme"],)).fetchone()
+        out.append({**rec, "label": label or rec["id"], "scheme_title": title[0] if title else rec["scheme"]})
+    return sorted(out, key=lambda x: (x["scheme"], x["label"]))
+
+
+def source_node(conn: sqlite3.Connection, ident: str) -> dict | None:
+    """A term of an attached source, shaped like a catalogue node (read from its lean file)."""
+    from .leansearch import record
+    r = record(conn, ident)
+    if r is None:
+        return None
+    defs = [a["value"] for a in r["attributes"] if a["role"] == "note" and str(a["predicate"]).endswith("definition")
+            and a["lang"] in ("en", "")]
+    return {"id": r["id"], "scheme": r["scheme"], "code": r["code"], "label": r["label"],
+            "scope_note": str(defs[0]) if defs else "", "status": r["status"], "labels": [
+                {"lang": x["lang"] or "und", "kind": x["kind"], "text": x["text"], "source": r["source"]} for x in r["labels"]],
+            "n_label_langs": len({x["lang"] for x in r["labels"]}), "langs": None,
+            "broader": r["broader"], "narrower": r["narrower"], "related": r["related"],
+            "mappings": [{"id": ln["target"], "label": ln["target"], "relation": ln["map"] or ln["predicate"],
+                          "method": f"declared:{r['scheme']} ({ln['predicate']})", "status": "proposed",
+                          "decided_by": "", "reviewer": "", "note": ""} for ln in r["links"]],
+            "documents": [], "claims": [], "neighbors": [], "attributes": {},
+            "provenance": [{"source": f"lean:{r['scheme']}", "sha512": r["lean_sha512"], "kind": "file",
+                            "license": r["license"]}],
+            "reviews": [], "sources": [], "attached": True}
 
 
 def graph(conn: sqlite3.Connection, schemes: tuple[str, ...] = GRAPH_SCHEMES, *, with_layout: bool = True) -> dict:

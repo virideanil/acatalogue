@@ -173,6 +173,37 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(r("http://www.wikidata.org/entity/Q1"), "wd/Q1")
         self.assertIsNone(r("https://unknown.example/x"))
 
+    def test_y_attach_mode_reads_in_place(self):
+        from acatalogue.leansearch import record, search
+        from acatalogue.views import linked_sources, node, source_node
+        conn = dbm.connect(self.db)
+        try:
+            srcs = {x["id"] for x in linked_sources(conn, "exvocab/c2")}
+            self.assertIn("explaces/7", srcs, "a concept shows where else it is")
+            self.store.select("explaces", mode="attach")
+            conn.execute("BEGIN")
+            integrate_store(conn, say=lambda *_: None)
+            conn.commit()
+            self.assertEqual(conn.execute("SELECT status FROM concept WHERE id = 'explaces/7'").fetchone()[0],
+                             "deprecated", "attached: the catalogue carries none of it")
+            hits = search(conn, "Nile Delta")
+            self.assertEqual(hits[0]["id"], "explaces/7")
+            self.assertEqual(hits[0]["mode"], "attach")
+            rec = record(conn, "explaces/8")
+            self.assertEqual([b["id"] for b in rec["broader"]], ["explaces/7"])
+            self.assertEqual(source_node(conn, "explaces/7")["label"], "Nile Delta")
+            self.assertIsNotNone(node(conn, "exvocab/c2"))
+        finally:
+            self.store.select("explaces", mode="full")
+            conn.close()
+        self.store.conn.execute("UPDATE selection SET mode = 'full' WHERE source = 'explaces'")
+        conn = dbm.connect(self.db)
+        conn.execute("BEGIN")
+        integrate_store(conn, say=lambda *_: None)
+        conn.commit()
+        self.assertEqual(conn.execute("SELECT status FROM concept WHERE id = 'explaces/7'").fetchone()[0], "active")
+        conn.close()
+
     def test_z_deselecting_retires_without_deleting(self):
         self.store.deselect("explaces")
         conn = dbm.connect(self.db)

@@ -49,9 +49,9 @@ acat show acat/tengrism        # everything about one id: labels, parents, mappi
 acat tree acat/belief -d 2     # the compendium as a tree
 acat audit                     # coverage and bias against declared baselines (stored per build)
 acat review queue              # machine-proposed crosswalks awaiting a person, exactMatch first
-acat review approve acat/physics wd/Q413 --reviewer "Your Name" [--perspective …]
-acat review revise  acat/x wd/Q1 --relation closeMatch --reviewer "…" --rationale "…"
-acat review object  acat/x wd/Q1 --reviewer "…" --rationale "…"    # decisions go to seed/reviews/<name>.tsv
+acat review approve acat/physics wd/Q413 --reviewer "Your Name" --human [--perspective …]
+acat review revise  acat/x wd/Q1 --relation closeMatch --reviewer "…" --human --rationale "…"
+acat review object  acat/x wd/Q1 --reviewer "…" --human --rationale "…"    # decisions go to seed/reviews/<name>.tsv
 acat eval                      # leave-one-language-out retrieval evaluation (stored in eval_* tables)
 acat embed                     # optional: dense multilingual label vectors (onnxruntime + the pinned model)
 acat verify                    # validate seeds, re-hash every corpus, check the ledger chain
@@ -60,6 +60,27 @@ acat compendium-md             # regenerate docs/COMPENDIUM.md
 acat export-graph              # write viz/data/graph.json for the particle field without a server
 acat fetch m49|external|wikidata|wikidata-statements|wikipedia|worldbank   # new dated, sealed corpus (network)
 ```
+
+## Sources: choose, download, integrate
+
+129 open sources are registered in `seed/sources/` (researched and checked live; who publishes each,
+its licence, languages and perspective, and how it is read). Choose a starting point, add your own,
+and let one command download, verify, convert and integrate them:
+
+```sh
+acat sources presets                       # starter, languages, places-and-time, library-subjects, …
+acat sources list --preset starter         # size, licence, languages, mode and perspective of each
+acat sources select preset:starter         # or individual ids; --mode full|attach
+acat sources add mydb --path ~/my.sqlite --converter sqlite --options '{"tables": [...]}'   # your own
+acat sources plan                          # what will be downloaded, how big, under which licence
+acat sources run                           # download (resumable, SHA-512) → seal → convert → integrate
+acat sources status                        # downloads, conversions, integrations, recent events
+acat sources search istanbul               # search every integrated source in place (attach mode too)
+acat sources term geonames/745044          # everything a source says about one of its terms
+```
+
+Downloads, sealed manifests and converted lean files live in the local store (`store/`, or
+`$ACAT_STORE`), never in git. `acat build` integrates the store's selection; `acat verify` re-hashes it.
 
 ## Layout
 
@@ -70,6 +91,8 @@ acat fetch m49|external|wikidata|wikidata-statements|wikipedia|worldbank   # new
 | `seed/schemes/*.tsv` | facet vocabularies (kind, epistemic) and external scheme top classes |
 | `seed/crosswalk/*.tsv` | crosswalks: ACAT ↔ UDC/DDC/LCC/Propædia, ACAT ↔ Wikidata (proposals, with who proposed them) |
 | `seed/reviews/<name>.tsv` | people's decisions on those proposals (`acat review`); applied on top at build |
+| `seed/sources/*.tsv` | the source registry, its files and presets (`research_notes/Open knowledge sources registry/curate.py`) |
+| `store/` | this machine's downloads, sealed manifests and lean files (not in git; `$ACAT_STORE`) |
 | `corpora/<name>-<yyyymmdd>/corpus.sqlite` | sealed named corpora: exact bytes (SQLite Archive table), fetch log, manifest |
 | `acatalogue/` | the Python package (standard library only) |
 | `acatalogue/schema.sql` | the catalogue schema and its enforced invariants |
@@ -86,5 +109,7 @@ its own licence, recorded per source in the database: Wikidata (CC0), Wikipedia 
 anything redistributed from `corpora/wikipedia-en-intros-*` must carry attribution and the same
 licence; every document stores its page URL and revision), UN M49 (UNSD public standard), UDC Summary
 (CC BY-SA 3.0), LCC (U.S. Government work), DDC (© OCLC; only class numbers and captions are cited),
-World Bank WDI (CC BY 4.0). The optional dense model, multilingual-e5-large-instruct (MIT), is not stored
+World Bank WDI (CC BY 4.0). Sources integrated from the local store keep theirs: each registry row
+states the licence, and each integrated scheme and lean file carries it (ShareAlike sources such as the
+UNESCO Thesaurus stay under their licence when redistributed). The optional dense model, multilingual-e5-large-instruct (MIT), is not stored
 in the repository: `acat embed` verifies the pinned files' SHA-256 before using them.

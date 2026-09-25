@@ -310,8 +310,13 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
     type_rank = {t: k for k, t in enumerate(types)}
     first_type: dict[int, int] = {}
     keep = options.get("keep_prefix")
+    blank = outside = 0
     for s, o in st.execute(f"SELECT s, o FROM t WHERE p = ? AND o IN ({marks}) ORDER BY s", (rdf_type,)):
-        if name_of[s].startswith("_:") or (keep and not name_of[s].startswith(keep)):
+        if name_of[s].startswith("_:"):              # no identity to cite: counted, not kept
+            blank += 1
+            continue
+        if keep and not name_of[s].startswith(keep):  # another vocabulary's term, referred to here
+            outside += 1
             continue
         if s not in first_type or type_rank[o] < type_rank[first_type[s]]:
             first_type[s] = o
@@ -327,6 +332,8 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
         for (s,) in st.execute("SELECT DISTINCT s FROM t WHERE p = ?", (pi,)):
             if not name_of[s].startswith("_:") and (not keep or name_of[s].startswith(keep)) and s not in first_type:
                 first_type[s] = fallback
+    w.dropped["blank_node_terms"] = blank
+    w.dropped["terms_outside_keep_prefix"] = outside
     terms = sorted(first_type)                       # the vocabulary's order of first mention
     # codes: the local part of each IRI; the most common namespace (or iri_prefix) makes the template
     spaces = Counter(_split(name_of[t])[0] for t in terms)

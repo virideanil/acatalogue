@@ -356,6 +356,17 @@ export function parseNode(json) {
             relation: str(r.relation),
             rationale: str(r.rationale),
         })),
+        sources: list(o.sources, (x) => ({
+            id: str(x.id),
+            label: str(x.label, str(x.id)),
+            scheme: str(x.scheme),
+            scheme_title: str(x.scheme_title, str(x.scheme)),
+            relation: str(x.relation),
+            method: str(x.method),
+            status: str(x.status),
+            via: str(x.via),
+            mode: str(x.mode),
+        })),
     };
 }
 export async function fetchNode(id, signal) {

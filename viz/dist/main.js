@@ -565,6 +565,7 @@ class App {
             neighbors,
             provenance: [],
             reviews: [],
+            sources: [],
         };
     }
     edgeWeight(a, b) {

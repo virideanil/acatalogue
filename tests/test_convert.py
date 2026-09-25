@@ -214,6 +214,11 @@ class RdfTests(unittest.TestCase):
                          ("broader", "link", "notation"))
         self.assertEqual(r.conn.execute("SELECT count(*) FROM label_fts WHERE label_fts MATCH 'physics'").fetchone()[0], 1)
 
+    def test_the_same_bytes_convert_to_the_same_file(self):
+        a = self.nt()[1]
+        b = run("rdf", [inp(self.tmp / "v.nt.gz")], tmp=self.tmp / "again")[1]
+        self.assertEqual(a["sha512"], b["sha512"], "a lean file is a function of its inputs and its reading")
+
     def test_rdfxml_and_turtle_read_the_same_as_ntriples(self):
         a = content(self.nt()[0])
         p = self.tmp / "v.rdf"

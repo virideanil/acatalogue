@@ -597,6 +597,7 @@ class App {
       neighbors,
       provenance: [],
       reviews: [],
+      sources: [],
     };
   }
 

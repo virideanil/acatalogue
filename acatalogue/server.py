@@ -104,6 +104,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/node":
                 ident = arg("id")
                 rec = node(conn, ident) if ident else None
+                if rec is None and ident:                  # a term of an attached source, read in place
+                    from .views import source_node
+                    rec = source_node(conn, ident)
                 if rec is None:
                     self._api_json({"error": f"no concept {ident!r}"}, HTTPStatus.NOT_FOUND)
                 else:
@@ -118,6 +121,21 @@ class Handler(BaseHTTPRequestHandler):
                                    HTTPStatus.BAD_REQUEST)
                     return
                 self._api_json(res.as_dict())
+            elif path == "/api/sources":
+                from .leansearch import sources
+                self._api_json({"sources": sources(conn)})
+            elif path == "/api/sources/search":
+                from .leansearch import search
+                schemes = [x for x in (arg("scheme") or "").split(",") if x]
+                self._api_json({"query": arg("q", ""), "hits": search(conn, arg("q", ""), schemes=schemes or None,
+                                                                       limit=int(arg("limit", "20")))})
+            elif path == "/api/sources/record":
+                from .leansearch import record
+                rec = record(conn, arg("id") or "")
+                if rec is None:
+                    self._api_json({"error": f"no term {arg('id')!r} in an integrated source"}, HTTPStatus.NOT_FOUND)
+                else:
+                    self._api_json(rec)
             else:
                 self._api_json({"error": f"unknown endpoint {path}"}, HTTPStatus.NOT_FOUND)
         finally:

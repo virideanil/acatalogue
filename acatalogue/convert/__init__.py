@@ -97,6 +97,12 @@ def members(inp: Input, pattern: str = "*") -> Iterator[tuple[str, BinaryIO]]:
                         with io.BufferedReader(_Raw(f), 1 << 20) as b, _decompress(b, m.name) as d:
                             yield m.name, d
         return
+    bare = inp.name                                     # a plain file answers to its name, compressed or not
+    for ext in (".gz", ".bz2", ".xz"):
+        if bare.lower().endswith(ext):
+            bare = bare[: -len(ext)]
+    if not (fnmatch.fnmatch(inp.name, pattern) or fnmatch.fnmatch(bare, pattern)):
+        return
     with open(inp.path, "rb") as raw, _decompress(raw, inp.name) as d:
         yield inp.name, d
 
@@ -115,7 +121,10 @@ def text_lines(stream: BinaryIO, encoding: str = "utf-8") -> Iterator[str]:
     try:
         yield from text
     finally:
-        text.detach()
+        try:
+            text.detach()
+        except ValueError:                              # the owner closed the stream first
+            pass
 
 
 def raw(inputs, w, options, progress=print) -> None:
