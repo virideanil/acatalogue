@@ -39,7 +39,7 @@ def claims_corpus(root: Path, name: str, triples: list[tuple[str, str, str]]) ->
 
 class SupersessionTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.conn = fresh(self.tmp)
 
     def test_newer_intros_supersede_older_same_name(self):
@@ -75,7 +75,7 @@ class SealTests(unittest.TestCase):
     def test_unsealed_corpus_never_feeds_a_build(self):
         from unittest import mock
         from acatalogue import build
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         old = CorpusFile(tmp / "fam-20260101" / "corpus.sqlite", create=True, name="fam-20260101", title="t")
         old.add("a", b"x")
         old.seal()
@@ -89,7 +89,7 @@ class SealTests(unittest.TestCase):
 
 class DeprecationTests(unittest.TestCase):
     def test_removed_concept_is_deprecated_and_ledgered(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         conn = fresh(tmp)
         conn.execute("INSERT INTO scheme(id, title, origin) VALUES ('t', 'T', 'authored')")
         header = "\t".join(CONCEPT_COLUMNS) + "\n"

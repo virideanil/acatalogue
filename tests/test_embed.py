@@ -17,7 +17,7 @@ def vec(*xs):
 
 class EmbeddingKeyTests(unittest.TestCase):
     def setUp(self):
-        self.conn = dbm.connect(Path(tempfile.mkdtemp()) / "t.sqlite", create=True)
+        self.conn = dbm.connect(Path(self.enterContext(tempfile.TemporaryDirectory())) / "t.sqlite", create=True)
         dbm.init_schema(self.conn)
         c = self.conn
         c.execute("INSERT INTO scheme(id, title, origin) VALUES ('acat', 'ACAT', 'authored')")

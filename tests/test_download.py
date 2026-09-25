@@ -92,7 +92,7 @@ class DownloadTests(unittest.TestCase):
         cls.httpd.server_close()
 
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.store = Store(self.tmp / "store")
         self.addCleanup(self.store.close)
         self.sleep = mock.patch("acatalogue.download.time.sleep").start()
@@ -189,7 +189,7 @@ class DownloadTests(unittest.TestCase):
 
 class ExternalManifestTests(unittest.TestCase):
     def test_external_items_are_hashed_and_verified(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         raw = tmp / "raw" / "s" / "20260925"
         raw.mkdir(parents=True)
         (raw / "x.bin").write_bytes(BODY)

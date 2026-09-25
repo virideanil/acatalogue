@@ -50,7 +50,7 @@ class FetcherTests(unittest.TestCase):
         cls.httpd.server_close()
 
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.corpus = CorpusFile(self.tmp / "c.sqlite", create=True, name="test-fetch", title="fetch tests")
         self.fetcher = Fetcher(self.corpus, min_interval=0, verbose=False)
         self.sleep = mock.patch("acatalogue.fetch.time.sleep").start()

@@ -1,8 +1,10 @@
 """The bias audit: its statistics against known values, and a stored run over a real build."""
 import math
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from acatalogue import db as dbm
 from acatalogue.audit import entropy_norm, gini, jsd, latest, wilson
@@ -37,8 +39,9 @@ class StoredRunTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from acatalogue.build import build
-        cls.tmp = Path(tempfile.mkdtemp())
-        build(cls.tmp / "cat.sqlite", verbose=False)
+        cls.tmp = Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
+        with mock.patch.dict(os.environ, {"ACAT_STORE": str(cls.tmp / "store")}):   # never this machine's downloads
+            build(cls.tmp / "cat.sqlite", verbose=False)
         cls.conn = dbm.connect(cls.tmp / "cat.sqlite", readonly=True)
         cls.audit = latest(cls.conn)
 

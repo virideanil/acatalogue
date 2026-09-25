@@ -12,7 +12,7 @@ HEADER = "\t".join(CONCEPT_COLUMNS) + "\n"
 
 class ValidatorTests(unittest.TestCase):
     def rows(self, text):
-        p = Path(tempfile.mkdtemp()) / "x.tsv"
+        p = Path(self.enterContext(tempfile.TemporaryDirectory())) / "x.tsv"
         p.write_text(HEADER + text, encoding="utf-8")
         return read_scheme("t", [p])
 

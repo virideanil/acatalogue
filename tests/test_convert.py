@@ -150,7 +150,7 @@ def inp(path: Path, name: str | None = None, url: str | None = None) -> Input:
 
 
 def run(conv: str, inputs, options=None, tmp=None):
-    tmp = tmp or Path(tempfile.mkdtemp())
+    tmp = tmp or Path(tempfile.mkdtemp(dir=inputs[0].path.parent))   # inside the test's own folder
     w = LeanWriter(tmp / "out.sqlite", source="t", title="t", converter=conv, version="1")
     for i in inputs:
         w.input(i.name, i.sha512, i.bytes, i.url, i.retrieved_at)
@@ -177,7 +177,7 @@ def content(r: LeanReader) -> dict:
 
 class RdfTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
 
     def nt(self):
         p = self.tmp / "v.nt.gz"
@@ -231,7 +231,7 @@ class RdfTests(unittest.TestCase):
 
 class OboTests(unittest.TestCase):
     def test_gene_ontology_stanzas(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         p = tmp / "go-basic.obo"
         p.write_text(OBO)
         r, out = run("obo", [inp(p)])
@@ -264,7 +264,7 @@ class TableTests(unittest.TestCase):
                            "status": {"column": "bookkeeping", "deprecated": ["True"]}}]}
 
     def test_a_declared_csv_mapping(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         z = tmp / "glottolog_languoid.csv.zip"
         with zipfile.ZipFile(z, "w") as f:
             f.writestr("languoid.csv", "id,parent_id,name,level,latitude,iso639P3code,bookkeeping\n"
@@ -283,7 +283,7 @@ class TableTests(unittest.TestCase):
                          "an empty cell is an absent value")
 
     def test_a_local_sqlite_database(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         db = tmp / "mine.sqlite"
         con = sqlite3.connect(db)
         con.executescript("CREATE TABLE wish(id INTEGER PRIMARY KEY, title TEXT, parent INTEGER, note TEXT);"
@@ -307,7 +307,7 @@ def zipped(path: Path, files: dict[str, str]) -> Path:
 
 class SourceTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
 
     def test_geonames(self):
         t = self.tmp

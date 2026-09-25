@@ -1,8 +1,10 @@
 """The retrieval evaluation: metrics, fusion, the hidden language, and a stored run over a real build."""
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from acatalogue import db as dbm
 from acatalogue.evaluate import Lexical, paired_test, per_query, queries, rrf, run
@@ -66,8 +68,9 @@ class RunTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from acatalogue.build import build
-        cls.tmp = Path(tempfile.mkdtemp())
-        build(cls.tmp / "cat.sqlite", verbose=False)
+        cls.tmp = Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
+        with mock.patch.dict(os.environ, {"ACAT_STORE": str(cls.tmp / "store")}):   # never this machine's downloads
+            build(cls.tmp / "cat.sqlite", verbose=False)
         cls.conn = dbm.connect(cls.tmp / "cat.sqlite")
 
     def add(self, cid, labels):

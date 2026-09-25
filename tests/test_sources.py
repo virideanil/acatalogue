@@ -41,7 +41,7 @@ class PipelineTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from acatalogue.build import build
-        cls.tmp = Path(tempfile.mkdtemp())
+        cls.tmp = Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
         www = cls.tmp / "www"
         www.mkdir()
         (www / "vocab.nt").write_text(VOCAB)
@@ -232,7 +232,7 @@ class _Quiet(SimpleHTTPRequestHandler):
 class AddedSourceTests(unittest.TestCase):
     def test_a_users_own_file(self):
         from acatalogue.cli import main
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         csv_path = tmp / "notes.csv"
         csv_path.write_text("id,title\na,First note\nb,Second note\n")
         store = tmp / "store"

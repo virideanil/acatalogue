@@ -1,8 +1,10 @@
 """The baked layout: the browser's own physics run in Node, deterministic, and marked stale when the graph moves on."""
+import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from acatalogue import db as dbm
 
@@ -13,9 +15,10 @@ class BakeTests(unittest.TestCase):
     def setUpClass(cls):
         from acatalogue.bake import bake
         from acatalogue.build import build
-        cls.tmp = Path(tempfile.mkdtemp())
+        cls.tmp = Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
         cls.path = cls.tmp / "cat.sqlite"
-        build(cls.path, verbose=False)
+        with mock.patch.dict(os.environ, {"ACAT_STORE": str(cls.tmp / "store")}):   # never this machine's downloads
+            build(cls.path, verbose=False)
         cls.conn = dbm.connect(cls.path)
         cls.first = bake(cls.conn)
         cls.pos1 = dict((t, (x, y)) for t, x, y in cls.conn.execute(

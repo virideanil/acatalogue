@@ -166,7 +166,7 @@ class ValueTests(unittest.TestCase):
 
 class ImportTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.conn = dbm.connect(self.tmp / "t.sqlite", create=True)
         dbm.init_schema(self.conn)
         self.summaries = summary_corpus(self.tmp, "wikidata-entities-20260101",
@@ -250,7 +250,7 @@ class ImportTests(unittest.TestCase):
 
     def test_each_entity_is_superseded_as_of_the_batch_that_read_it(self):
         """A summary recorded between two batches is superseded only by a batch read after it."""
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         conn = dbm.connect(tmp / "t.sqlite", create=True)
         dbm.init_schema(conn)
         summaries = summary_corpus(tmp, "wikidata-entities-20260115", [("Q1", "P279", "Q2"), ("Q3", "P279", "Q4")],

@@ -1,4 +1,5 @@
 """Human review kept apart from machine proposals: decisions layer on top, nothing is overwritten."""
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,8 +20,8 @@ PROPOSALS = [
 
 class DecisionTests(unittest.TestCase):
     def setUp(self):
-        self.dir = Path(tempfile.mkdtemp())
-        guard = mock.patch.object(review, "REVIEW_DIR", Path(tempfile.mkdtemp()) / "must-stay-empty")
+        self.dir = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        guard = mock.patch.object(review, "REVIEW_DIR", Path(self.enterContext(tempfile.TemporaryDirectory())) / "must-stay-empty")
         guard.start()
         self.addCleanup(guard.stop)
 
@@ -91,7 +92,7 @@ class BuildTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from acatalogue.build import build
-        cls.tmp = Path(tempfile.mkdtemp())
+        cls.tmp = Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
         reviews = cls.tmp / "reviews"
         review.append("Ada Reviewer", review.mapping_target("acat/abjads", "wd/Q185087"), "object",
                       kind="human", rationale="test objection", directory=reviews)
@@ -99,7 +100,7 @@ class BuildTests(unittest.TestCase):
                       kind="human", relation="closeMatch", rationale="test revision", directory=reviews)
         review.append("Ada Reviewer", review.mapping_target("acat/acoustics", "wd/Q82811"), "approve",
                       kind="human", perspective="test", directory=reviews)
-        with mock.patch.object(review, "REVIEW_DIR", reviews):
+        with mock.patch.object(review, "REVIEW_DIR", reviews), mock.patch.dict(os.environ, {"ACAT_STORE": str(cls.tmp / "store")}):
             cls.report = build(cls.tmp / "cat.sqlite", verbose=False)
         cls.conn = dbm.connect(cls.tmp / "cat.sqlite", readonly=True)
 

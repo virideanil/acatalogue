@@ -1,11 +1,13 @@
 """The SQL grepper: pure helpers, and an integration run over a catalogue built from the committed corpora."""
 import json
+import os
 import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 import random
 import re
@@ -82,15 +84,17 @@ class CatalogueTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from acatalogue.build import build
-        cls.tmp = Path(tempfile.mkdtemp())
+        cls.tmp = Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
         cls.db = cls.tmp / "cat.sqlite"
-        cls.report = build(cls.db, verbose=False)
+        with mock.patch.dict(os.environ, {"ACAT_STORE": str(cls.tmp / "store")}):   # never this machine's downloads
+            cls.report = build(cls.db, verbose=False)
         cls.conn = dbm.connect(cls.db, readonly=True)
 
     def test_build_links_resolve(self):
         self.assertEqual(self.report["links"]["facets_dangling"], [])
         self.assertEqual(self.report["links"]["mappings_dangling"], [])
         self.assertEqual(self.report["external"]["unverified"], [])
+        self.assertNotIn("sources", self.report)          # seed/ and corpora/ alone, nothing from a store
 
     def test_words(self):
         res = grep(self.conn, "quantum", scope="concepts")

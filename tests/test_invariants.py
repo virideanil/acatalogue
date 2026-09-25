@@ -18,7 +18,7 @@ def fresh_db(tmp: Path) -> sqlite3.Connection:
 
 class LedgerTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.conn = fresh_db(self.tmp)
         for i in range(5):
             ledger.record(self.conn, "test", "act", target=f"acat/x{i}", detail={"i": i}, receipt=f"r{i}", undo="u")
@@ -46,7 +46,7 @@ class LedgerTests(unittest.TestCase):
 
 class NeverDeletedTests(unittest.TestCase):
     def setUp(self):
-        self.conn = fresh_db(Path(tempfile.mkdtemp()))
+        self.conn = fresh_db(Path(self.enterContext(tempfile.TemporaryDirectory())))
         sha = sha512_bytes(b"x")
         self.conn.execute("INSERT INTO source(sha512, bytes, kind, name, first_seen) VALUES (?,1,'seed','x',?)",
                           (sha, utcnow()))
@@ -70,7 +70,7 @@ class NeverDeletedTests(unittest.TestCase):
 
 class CorpusTests(unittest.TestCase):
     def setUp(self):
-        self.path = Path(tempfile.mkdtemp()) / "c" / "corpus.sqlite"
+        self.path = Path(self.enterContext(tempfile.TemporaryDirectory())) / "c" / "corpus.sqlite"
         self.c = CorpusFile(self.path, create=True, name="test-20260101", title="t")
 
     def test_roundtrip_and_dedup(self):
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 class MigrationTests(unittest.TestCase):
     def test_v2_to_v3_adds_day_bounds_and_keeps_every_claim(self):
         from acatalogue.migrate import migrate
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         conn = fresh_db(tmp)
         conn.execute("INSERT INTO source(sha512, bytes, kind, name, first_seen) VALUES (?, 1, 'seed', 's', ?)",
                      ("a" * 128, utcnow()))
@@ -142,7 +142,7 @@ class MigrationTests(unittest.TestCase):
 class LabelMigrationTests(unittest.TestCase):
     def test_v4_to_v5_keeps_label_ids_and_allows_hidden_labels(self):
         from acatalogue.migrate import migrate
-        tmp = Path(tempfile.mkdtemp())
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         conn = fresh_db(tmp)
         conn.execute("INSERT INTO scheme(id, title, origin) VALUES ('t', 'T', 'external')")
         conn.execute("INSERT INTO concept(id, scheme, code, label) VALUES ('t/a', 't', 'a', 'A')")
