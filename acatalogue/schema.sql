@@ -19,7 +19,7 @@
 
 -- user_version is the schema version; acatalogue/migrate.py upgrades older databases in place
 -- (copying every row that must never be lost) before this file runs.
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -223,6 +223,8 @@ CREATE TABLE IF NOT EXISTS claim (
   valid_from      TEXT,                 -- world time (ISO 8601 / EDTF / Wikidata time); NULL = not stated
   valid_to        TEXT,
   time_precision  INTEGER,              -- Wikidata precision code (9 year, 10 month, 11 day …)
+  valid_from_day  INTEGER,              -- Julian Day Numbers bounding the widest interval the stated
+  valid_to_day    INTEGER,              --   precisions allow: sortable, and correct across BCE
   source_sha512   TEXT NOT NULL REFERENCES source(sha512),
   recorded_at     TEXT NOT NULL,        -- record time: when this catalogue learned it
   superseded_at   TEXT,                 -- record time: when a newer statement replaced it
@@ -265,6 +267,50 @@ CREATE TRIGGER IF NOT EXISTS claim_qualifier_never_deleted BEFORE DELETE ON clai
 BEGIN SELECT RAISE(ABORT, 'qualifiers belong to claims and are never deleted'); END;
 CREATE TRIGGER IF NOT EXISTS claim_reference_never_deleted BEFORE DELETE ON claim_reference
 BEGIN SELECT RAISE(ABORT, 'references belong to claims and are never deleted'); END;
+
+-- ─── review: who decided, from which perspective ────────────────────────────
+CREATE TABLE IF NOT EXISTS review (
+  id            INTEGER PRIMARY KEY,
+  target        TEXT NOT NULL,        -- 'mapping:<from>|<to>', 'concept:<id>', 'label:<concept>|<lang>|<text>'
+  reviewer      TEXT NOT NULL,
+  reviewer_kind TEXT NOT NULL CHECK (reviewer_kind IN ('human', 'agent')),
+  perspective   TEXT,                 -- the reviewer's declared perspective, tradition or region
+  decided_at    TEXT NOT NULL,
+  decision      TEXT NOT NULL CHECK (decision IN ('approve', 'revise', 'object')),
+  rationale     TEXT,
+  source_sha512 TEXT NOT NULL REFERENCES source(sha512),   -- the review file it was read from
+  UNIQUE (target, reviewer, decided_at)
+);
+
+-- ─── audit: declared baselines and stored measurements ──────────────────────
+CREATE TABLE IF NOT EXISTS baseline (   -- reference distributions an audit compares coverage against
+  dimension     TEXT NOT NULL,          -- 'population', 'land_area'
+  group_id      TEXT NOT NULL,          -- scoped id of the country or area
+  value         REAL NOT NULL,
+  unit          TEXT NOT NULL,
+  as_of         TEXT NOT NULL,          -- the source's reference year
+  source_sha512 TEXT NOT NULL REFERENCES source(sha512),
+  PRIMARY KEY (dimension, group_id, as_of)
+);
+CREATE TABLE IF NOT EXISTS audit_run (
+  id          INTEGER PRIMARY KEY,
+  at          TEXT NOT NULL,
+  ledger_head TEXT NOT NULL,            -- the catalogue state the numbers describe
+  params      TEXT NOT NULL,            -- JSON: seed, bootstrap size, baselines, exclusions
+  report      TEXT                      -- JSON presentation copy of the run for the API
+);
+CREATE TABLE IF NOT EXISTS audit_metric (
+  run_id    INTEGER NOT NULL REFERENCES audit_run(id),
+  dimension TEXT NOT NULL,              -- 'regions', 'subregions', 'siblings:<parent>', 'attention', 'review'
+  group_id  TEXT NOT NULL,              -- the group measured; '' for a whole-distribution metric
+  metric    TEXT NOT NULL,              -- 'share', 'log2_rr', 'jsd_bits', 'gini_rr', 'cv_subtree', ...
+  baseline  TEXT NOT NULL DEFAULT '',   -- 'population', 'land_area', 'equal', or ''
+  value     REAL,
+  lo        REAL,                       -- interval bounds where the metric has one
+  hi        REAL,
+  n         REAL,                       -- the denominator the value came from
+  PRIMARY KEY (run_id, dimension, group_id, metric, baseline)
+);
 
 -- ─── derived: statistics, semantic vectors, layout ──────────────────────────
 CREATE TABLE IF NOT EXISTS concept_stat (

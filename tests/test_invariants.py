@@ -108,3 +108,27 @@ class CorpusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MigrationTests(unittest.TestCase):
+    def test_v2_to_v3_adds_day_bounds_and_keeps_every_claim(self):
+        from acatalogue.migrate import migrate
+        tmp = Path(tempfile.mkdtemp())
+        conn = fresh_db(tmp)
+        conn.execute("INSERT INTO source(sha512, bytes, kind, name, first_seen) VALUES (?, 1, 'seed', 's', ?)",
+                     ("a" * 128, utcnow()))
+        for i in range(3):
+            conn.execute("INSERT INTO claim(subject, predicate, value, source_sha512, recorded_at) VALUES (?,?,?,?,?)",
+                         (f"acat/x{i}", "wd/P1", str(i), "a" * 128, utcnow()))
+        conn.commit()
+        # make it a v2 database: the claim table without the day-bound columns
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(claim)") if r[1] not in ("valid_from_day", "valid_to_day")]
+        conn.executescript(f"""
+            CREATE TABLE claim_old AS SELECT {', '.join(cols)} FROM claim;
+            DROP TABLE claim; ALTER TABLE claim_old RENAME TO claim; PRAGMA user_version = 2;""")
+        self.assertEqual(migrate(conn), ["2->3"])
+        self.assertIn("valid_from_day", [r[1] for r in conn.execute("PRAGMA table_info(claim)")])
+        self.assertEqual(conn.execute("SELECT count(*) FROM claim").fetchone()[0], 3)
+        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 3)
+        self.assertEqual(conn.execute("SELECT count(*) FROM ledger WHERE action = 'migrate-schema'").fetchone()[0], 1)
+        self.assertEqual(migrate(conn), [], "a migrated database needs nothing more")

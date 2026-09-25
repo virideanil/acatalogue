@@ -10,10 +10,10 @@ import sqlite3
 from collections import defaultdict, deque
 from pathlib import Path
 
-from . import compendium, ledger
+from . import audit, compendium, ledger
 from .corpusfile import CORPORA_DIR, CorpusFile
 from .db import DEFAULT_DB, connect, init_schema
-from .sources import external, m49, wikidata, wikipedia
+from .sources import external, m49, wikidata, wikipedia, worldbank
 from .textkeys import KEY_VERSION, cjk_bigrams, fold_key, has_cjk, nfc
 from .util import REPO_ROOT, utcnow
 
@@ -153,6 +153,11 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
         if (c := latest_corpus("un-m49")) is not None:
             report["m49"] = m49.import_into(conn, c, ACTOR)
             say(f"M49 ({c.name}): {report['m49']}")
+        if (c := latest_corpus("worldbank-wdi")) is not None:
+            rep = worldbank.import_baselines(conn, c, ACTOR)
+            report["baselines"] = {"rows": rep["rows"], "not_in_m49": rep["not_in_m49"],
+                                   "no_value": {k: len(v) for k, v in rep["no_value"].items()}}
+            say(f"baselines ({c.name}): {report['baselines']}")
         if (c := latest_corpus("external-schemes")) is not None:
             rep = external.verify(conn, c, ACTOR)
             report["external"] = {"checked": rep["checked"], "verified": rep["verified"],
@@ -189,6 +194,10 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
 
         report["search"] = rebuild_search(conn)
         report["stats"] = compute_stats(conn)
+        a = audit.run(conn, ACTOR)
+        report["audit"] = {"run": a["run_id"], "regions_n": a["regions"]["n"],
+                           "jsd_bits": {k: round(v["jsd_bits"], 4) for k, v in a["regions"]["distribution"].items() if v}}
+        say(f"audit: {report['audit']}")
         conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('built_at', ?)", (utcnow(),))
         conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('schemes_seed_sha512', ?)", (reg.sha512,))
         ledger.record(conn, ACTOR, "build-end",

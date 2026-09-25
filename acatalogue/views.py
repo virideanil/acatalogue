@@ -204,20 +204,26 @@ def audit(conn: sqlite3.Connection) -> dict:
             continue
         hit = conn.execute(
             f"SELECT 1 FROM claim WHERE subject IN ({','.join('?' * len(wc))}) AND object IN ({','.join('?' * len(wp))})"
-            " AND predicate IN ('wd/P279', 'wd/P361', 'wd/P31', 'wd/P1269') LIMIT 1", wc + wp).fetchone()
+            " AND predicate IN ('wd/P279', 'wd/P361', 'wd/P31', 'wd/P1269') AND superseded_at IS NULL"
+            " AND coalesce(rank, 'normal') <> 'deprecated' LIMIT 1", wc + wp).fetchone()
         if hit:
             stated += 1
         else:
             unstated += 1
             if len(unstated_pairs) < 40:
                 unstated_pairs.append({"child": child, "parent": parent})
+    from .audit import latest
     return {
         "generated_at": utcnow(), "domains": domains, "thinnest": thinnest, "regions": regions,
         "label_languages": label_languages, "label_language_count": n_langs, "unmatched": unmatched,
         "hierarchy_vs_wikidata": {"stated": stated, "not_stated": unstated, "examples_not_stated": unstated_pairs},
+        "baseline_audit": latest(conn),
         "notes": [
-            "langs = Wikipedia language editions with an article on the matched Wikidata item: a measure of "
-            "encyclopedic attention across languages, not of importance.",
+            "langs = Wikipedia language editions with an article on the matched Wikidata item, leaving out the "
+            "bot-generated Cebuano and Waray editions: a measure of encyclopedic attention across languages, "
+            "not of importance.",
+            "baseline_audit compares regional shares with declared baselines (population, land area, equal "
+            "shares). A ratio of 1 is parity with that baseline, not a verdict: which baseline is fair is a choice.",
             "regions counts ACAT concepts tagged with a UN M49 region or any place inside it.",
             "hierarchy_vs_wikidata counts ACAT parent links that Wikidata also states (subclass of, part of, "
             "instance of, facet of) between the matched items. 'Not stated' is not 'disagrees': Wikidata may be "

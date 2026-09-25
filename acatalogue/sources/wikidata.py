@@ -23,6 +23,9 @@ ATTRIBUTION = "Wikidata contributors"
 DECISIONS = REPO_ROOT / "seed" / "crosswalk" / "acat-wikidata.tsv"
 DECISION_COLUMNS = ["from", "to", "relation", "status", "method", "reviewer", "note"]
 LABEL_RELATIONS = {"exactMatch", "closeMatch"}   # only these donate their labels to our concept
+# Lsjbot mass-generated the Cebuano and Waray editions (species and places), so their sitelinks
+# measure a bot's reach, not human attention: the attention count leaves them out (raw count kept)
+BOT_WIKIS = ("cebwiki", "warwiki")
 CLAIM_PROPERTIES = {
     "P31": "instance of", "P279": "subclass of", "P361": "part of", "P527": "has part(s)",
     "P2578": "studies", "P2579": "studied by", "P1269": "facet of",
@@ -282,15 +285,23 @@ def fetch_statements(qids: list[str], name: str | None = None) -> CorpusFile:
     for it in corpus.items():
         if it["name"].startswith("entities/"):
             named |= referenced_entities(json.loads(corpus.get(it["name"])))
+    # Labels come from the query service, 2,000 entities per query: a few requests instead of hundreds of
+    # API calls. (The 2026-09-25 corpus also holds 19 earlier API label batches; those ids are skipped.)
+    for it in corpus.items():
+        if it["name"].startswith("labels/batch-"):
+            named -= set(json.loads(corpus.get(it["name"])).get("entities", {}))
     todo = sorted(named, key=_entity_key)
     print(f"  {len(qids)} entities fetched; {len(todo)} referenced items and properties to label", flush=True)
-    for n, start in enumerate(range(0, len(todo), 50), 1):
-        q = {"action": "wbgetentities", "ids": "|".join(todo[start:start + 50]), "props": "labels",
-             "languages": "en|mul", "format": "json", "maxlag": MAXLAG}
-        f.fetch(f"labels/batch-{n:04d}.json", f"{API}?{urllib.parse.urlencode(q)}",
-                license=LICENSE, attribution=ATTRIBUTION, check=mediawiki_check)
-        if n % 25 == 0:
-            print(f"  labels {min(start + 50, len(todo))}/{len(todo)}", flush=True)
+    f = Fetcher(corpus, min_interval=2.0)
+    for n, start in enumerate(range(0, len(todo), 2000), 1):
+        values = " ".join(f"wd:{e}" for e in todo[start:start + 2000])
+        query = ("SELECT ?e ?l WHERE {\n"
+                 f"  VALUES ?e {{ {values} }}\n"
+                 '  ?e rdfs:label ?l . FILTER(LANG(?l) = "en" || LANG(?l) = "mul")\n'
+                 "}")
+        f.fetch(f"labels/sparql-{n:03d}.json", SPARQL, data={"query": query, "format": "json"},
+                headers={"Accept": "application/sparql-results+json"}, license=LICENSE, attribution=ATTRIBUTION,
+                check=sparql_check)
     return corpus
 
 
@@ -378,7 +389,9 @@ def import_entities(conn: sqlite3.Connection, corpus: CorpusFile, decisions: lis
                                                                                   "metawiki", "mediawikiwiki",
                                                                                   "wikidatawiki", "sourceswiki")]
             conn.execute("INSERT OR REPLACE INTO attribute(concept_id, key, value, source_sha512) VALUES (?,?,?,?)",
-                         (f"wd/{qid}", "sitelinks", str(len(wikis)), digest))
+                         (f"wd/{qid}", "sitelinks", str(sum(1 for k in wikis if k not in BOT_WIKIS)), digest))
+            conn.execute("INSERT OR REPLACE INTO attribute(concept_id, key, value, source_sha512) VALUES (?,?,?,?)",
+                         (f"wd/{qid}", "sitelinks_all", str(len(wikis)), digest))
             if "enwiki" in sitelinks:
                 conn.execute("INSERT OR REPLACE INTO attribute(concept_id, key, value, source_sha512)"
                              " VALUES (?,?,?,?)", (f"wd/{qid}", "enwiki", sitelinks["enwiki"]["title"], digest))
@@ -484,13 +497,11 @@ def _julian_to_gregorian(year: int, month: int, day: int) -> tuple[int, int, int
     return 100 * b + d - 4800 + m // 10, m + 3 - 12 * (m // 10), e - (153 * m + 2) // 5 + 1
 
 
-def wd_time(v: dict) -> tuple[str, int] | None:
-    """A Wikidata time value as ISO 8601 / EDTF text: proleptic Gregorian calendar, astronomical years
-    (1 BCE = 0000), cut to the value's precision. Returns (text, precision of the text).
-
-    The JSON counts 1 BCE as -0001, so negative years shift by one. Day-precision Julian dates are
-    converted; a Julian month cannot be named in the Gregorian calendar, so it is cut to its year.
-    Precisions coarser than a year (decade 8, century 7, ...) keep Wikidata's year and code."""
+def wd_time_parts(v: dict) -> tuple[int, int, int, int] | None:
+    """A Wikidata time value as (year, month, day, precision) in the proleptic Gregorian calendar with
+    astronomical years (1 BCE = 0), cut to what the value states. The JSON counts 1 BCE as -0001, so
+    negative years shift by one. Day-precision Julian dates are converted; a Julian month cannot be named
+    in the Gregorian calendar, so it is cut to its year. Precisions coarser than a year keep their code."""
     m = _TIME.match(v.get("time", ""))
     if not m:
         return None
@@ -503,12 +514,65 @@ def wd_time(v: dict) -> tuple[str, int] | None:
     if prec >= 11 and month and day and not (julian and year < -4700):
         if julian:
             year, month, day = _julian_to_gregorian(year, month, day)
-        prec, text = 11, f"-{month:02d}-{day:02d}"
-    elif prec >= 10 and month and not julian:
-        prec, text = 10, f"-{month:02d}"
-    else:
-        prec, text = min(prec, 9), ""
-    return (f"{year:04d}" if year >= 0 else f"-{-year:04d}") + text, prec
+        return year, month, day, 11
+    if prec >= 10 and month and not julian:
+        return year, month, 0, 10
+    return year, 0, 0, min(prec, 9)
+
+
+def format_time(parts: tuple[int, int, int, int]) -> str:
+    """ISO 8601 / EDTF text of (year, month, day, precision), cut to the precision."""
+    year, month, day, prec = parts
+    text = f"{year:04d}" if year >= 0 else f"-{-year:04d}"
+    if prec >= 10:
+        text += f"-{month:02d}"
+    if prec >= 11:
+        text += f"-{day:02d}"
+    return text
+
+
+def wd_time(v: dict) -> tuple[str, int] | None:
+    """ISO 8601 / EDTF text of a Wikidata time value and the precision of that text."""
+    parts = wd_time_parts(v)
+    return None if parts is None else (format_time(parts), parts[3])
+
+
+def _jdn(year: int, month: int, day: int) -> int:
+    """Julian Day Number of a proleptic Gregorian date (astronomical year)."""
+    a = (14 - month) // 12
+    y, m = year + 4800 - a, month + 12 * a - 3
+    return day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
+
+
+def _year_span(year: int, prec: int) -> tuple[int, int] | None:
+    """First and last astronomical year a year of this precision covers. Decades run 1960-1969;
+    centuries and millennia count as Wikidata does (1900 at century precision is 1801-1900)."""
+    if prec >= 9:
+        return year, year
+    if prec == 8:
+        return year // 10 * 10, year // 10 * 10 + 9
+    if prec in (6, 7):
+        size = 100 if prec == 7 else 1000
+        if year > 0:
+            n = (year + size - 1) // size
+            return (n - 1) * size + 1, n * size
+        n = (1 - year + size - 1) // size          # counted in historical BCE years
+        return 1 - n * size, -(n - 1) * size
+    return None
+
+
+def day_bounds(parts: tuple[int, int, int, int]) -> tuple[int | None, int | None]:
+    """(first, last) Julian Day Number of the interval a time value of its precision covers."""
+    year, month, day, prec = parts
+    if prec >= 11:
+        return _jdn(year, month, day), _jdn(year, month, day)
+    if prec == 10:
+        nxt = (year + 1, 1) if month == 12 else (year, month + 1)
+        return _jdn(year, month, 1), _jdn(*nxt, 1) - 1
+    span = _year_span(year, prec)
+    if span is None or span[0] < -4700:
+        return None, None
+    return _jdn(span[0], 1, 1), _jdn(span[1] + 1, 1, 1) - 1
 
 
 def snak_parts(s: dict) -> tuple[str, str | None, str | None, str | None]:
@@ -525,19 +589,22 @@ def snak_parts(s: dict) -> tuple[str, str | None, str | None, str | None]:
     return kind, None, json.dumps(dv["value"], ensure_ascii=False, sort_keys=True, separators=(",", ":")), dt
 
 
-def validity(qualifiers: dict) -> tuple[str | None, str | None, int | None]:
+def validity(qualifiers: dict) -> tuple[str | None, str | None, int | None, int | None, int | None]:
     """World time of a statement from its start time (P580), end time (P582) or point in time (P585)
-    qualifiers, only when each is a single known value. Everything else stays in claim_qualifier."""
-    def one(pid: str) -> tuple[str, int] | None:
+    qualifiers, only when each is a single known value; everything else stays in claim_qualifier.
+    Returns (from text, to text, coarsest precision, first day, last day) with Julian Day Numbers."""
+    def one(pid: str) -> tuple[int, int, int, int] | None:
         snaks = qualifiers.get(pid, [])
         if len(snaks) != 1 or snaks[0]["snaktype"] != "value" or snaks[0]["datavalue"]["type"] != "time":
             return None
-        return wd_time(snaks[0]["datavalue"]["value"])
+        return wd_time_parts(snaks[0]["datavalue"]["value"])
     start, end, point = one("P580"), one("P582"), one("P585")
     if point and not (start or end):
         start = end = point
-    precisions = [t[1] for t in (start, end) if t]
-    return (start[0] if start else None, end[0] if end else None, min(precisions) if precisions else None)
+    precisions = [p[3] for p in (start, end) if p]
+    return (format_time(start) if start else None, format_time(end) if end else None,
+            min(precisions) if precisions else None,
+            day_bounds(start)[0] if start else None, day_bounds(end)[1] if end else None)
 
 
 def _pointer(*parts: str | int) -> str:
@@ -557,10 +624,18 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
         if not it["name"].startswith("labels/"):
             continue
         digest = _register_source(conn, corpus, it["name"])
-        for eid, ent in json.loads(corpus.get(it["name"])).get("entities", {}).items():
-            labels = ent.get("labels", {})
-            text = (labels.get("en") or labels.get("mul") or {}).get("value")
-            if "missing" not in ent and text:
+        data = json.loads(corpus.get(it["name"]))
+        found: dict[str, dict[str, str]] = {}
+        if it["name"].startswith("labels/sparql-"):     # query service rows: one per entity and language
+            for b in data["results"]["bindings"]:
+                found.setdefault(b["e"]["value"].rsplit("/", 1)[-1], {})[b["l"].get("xml:lang", "")] = b["l"]["value"]
+        else:                                           # wbgetentities batches
+            for eid, ent in data.get("entities", {}).items():
+                if "missing" not in ent:
+                    found[eid] = {lang: v["value"] for lang, v in ent.get("labels", {}).items()}
+        for eid, labels in found.items():
+            text = labels.get("en") or labels.get("mul")
+            if text:
                 cur = conn.execute("INSERT INTO concept(id, scheme, code, label, source_sha512) VALUES (?,?,?,?,?)"
                                    " ON CONFLICT(id) DO NOTHING", (f"wd/{eid}", "wd", eid, nfc(text), digest))
                 stats["labelled"] += cur.rowcount
@@ -579,14 +654,15 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
             for pid, statements in ent.get("claims", {}).items():
                 for i, st in enumerate(statements):
                     kind, obj, value, dt = snak_parts(st["mainsnak"])
-                    valid_from, valid_to, precision = validity(st.get("qualifiers", {}))
+                    valid_from, valid_to, precision, from_day, to_day = validity(st.get("qualifiers", {}))
                     cur = conn.execute(
                         "INSERT OR IGNORE INTO claim(subject, predicate, snak_type, object, value, datatype, rank,"
                         " statement_id, source_revision, source_pointer, epistemic, valid_from, valid_to,"
-                        " time_precision, source_sha512, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        " time_precision, valid_from_day, valid_to_day, source_sha512, recorded_at)"
+                        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (f"wd/{qid}", f"wd/{pid}", kind, obj, value, dt, st.get("rank"), st["id"],
                          ent.get("lastrevid"), _pointer("entities", qid, "claims", pid, i), "epistemic/attributed",
-                         valid_from, valid_to, precision, digest, recorded))
+                         valid_from, valid_to, precision, from_day, to_day, digest, recorded))
                     stats["claims"] += 1
                     if not cur.rowcount:                         # already imported from these bytes
                         continue

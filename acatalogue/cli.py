@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -179,6 +180,53 @@ def cmd_stats(args) -> int:
     return 0
 
 
+def _rr_cell(v: dict) -> str:
+    if v["rr"] is None:
+        return "no baseline"
+    if v["rr"] == 0:
+        return "none tagged"
+    lo = f"{math.log2(v['rr_lo']):+.1f}" if v["rr_lo"] else "-inf"
+    return f"{v['log2_rr']:+.2f} [{lo},{math.log2(v['rr_hi']):+.1f}]"
+
+
+def _print_baseline_audit(b: dict | None) -> None:
+    if not b:
+        print("\n(no stored baseline audit: run `acat build`)")
+        return
+    for level, title in (("regions", "UN M49 regions"), ("subregions", "UN M49 sub-regions")):
+        r = b[level]
+        print(f"\n{title}: {r['n']} place-tagged concepts, each split evenly over its regions.")
+        print("log2 representation ratio vs each baseline (0 = parity, +1 = twice the baseline share),"
+              " [95% Wilson interval]")
+        names = list(r["groups"][0]["vs"]) if r["groups"] else []
+        print(f"{'group':34s} {'share':>6s}  " + "  ".join(f"{n:>20s}" for n in names))
+        for g in r["groups"]:
+            print(f"{g['label'][:34]:34s} {g['share']:6.1%}  " + "  ".join(f"{_rr_cell(g['vs'][n]):>20s}"
+                                                                         for n in names))
+        for name, d in r["distribution"].items():
+            if d:
+                verdict = "beyond" if d["exceeds_null"] else "within"
+                print(f"  vs {name}: JSD {d['jsd_bits']:.3f} bits [{d['jsd_lo']:.3f}, {d['jsd_hi']:.3f}], "
+                      f"{verdict} random sampling (null p95 {d['null_p95']:.3f}); Gini of ratios {d['gini_rr']:.2f}")
+        print(f"  normalized entropy {r['entropy_norm']:.2f}; tagged only above this level: {r['tagged_above_level']};"
+              f" concepts with no place: {r['untagged']}")
+        for dim, cov in r["baseline_coverage"].items():
+            print(f"  {dim} ({cov['as_of']}): {cov['areas_with_value']}/{cov['areas']} areas have a value")
+    print("\nSibling parity (children of one parent; CV = spread of subtree sizes):")
+    for s in b["siblings"][:10]:
+        q = s["quantities"]["subtree"]
+        flags = ", ".join(f"{f['label']} ({f['subtree']})" for f in s["flags"])
+        print(f"  CV {q['cv']:.2f}  {s['label'][:40]:40s} {s['children']:3d} children, sizes {q['min']}-{q['max']}"
+              + (f"; look at: {flags}" if flags else ""))
+    at = b["attention"]
+    print(f"\nAttention: median Wikipedia editions {at['median']} without {'/'.join(at['excluded_editions'])}"
+          f" ({at['median_all']} with them); {at['concepts_with_bot_editions']} concepts change")
+    print("\nWho decided the accepted crosswalks:")
+    for kind, rels in b["review"]["accepted_by_decider"].items():
+        print(f"  {kind:32s} " + ", ".join(f"{k} {v}" for k, v in sorted(rels.items())))
+    print(f"  human reviews recorded: {b['review']['human_reviews']}")
+
+
 def cmd_audit(args) -> int:
     from .views import audit
     a = audit(_ro(args))
@@ -198,6 +246,7 @@ def cmd_audit(args) -> int:
         print(f"  {r['tagged']:4d}  {r['label']}")
     h = a["hierarchy_vs_wikidata"]
     print(f"\nACAT parent links also stated by Wikidata: {h['stated']}; not stated: {h['not_stated']}")
+    _print_baseline_audit(a.get("baseline_audit"))
     print(f"Label languages: {a['label_language_count']}; concepts without a Wikidata match: {len(a['unmatched'])}")
     for n in a["notes"]:
         print(f"note: {n}")
@@ -267,6 +316,9 @@ def cmd_fetch(args) -> int:
         c = m49.fetch()
     elif args.source == "external":
         c = external.fetch()
+    elif args.source == "worldbank":
+        from .sources import worldbank
+        c = worldbank.fetch()
     elif args.source == "wikidata-statements":
         decisions = wikidata.read_decisions()
         qids = sorted({d["to"][3:] for d in decisions if d["status"] == "accepted" and d["to"].startswith("wd/")},
@@ -379,7 +431,8 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_compendium_md)
 
     p = sub.add_parser("fetch", help="fetch a source into a new dated, sealed corpus")
-    p.add_argument("source", choices=["m49", "external", "wikidata", "wikidata-statements", "wikipedia"])
+    p.add_argument("source", choices=["m49", "external", "wikidata", "wikidata-statements", "wikipedia",
+                                      "worldbank"])
     p.set_defaults(fn=cmd_fetch)
 
     args = ap.parse_args(argv)

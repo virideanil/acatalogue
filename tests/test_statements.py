@@ -8,7 +8,7 @@ from pathlib import Path
 from acatalogue import db as dbm, ledger
 from acatalogue.corpusfile import CorpusFile
 from acatalogue.sources import wikidata
-from acatalogue.sources.wikidata import JULIAN, snak_parts, validity, wd_time
+from acatalogue.sources.wikidata import JULIAN, _jdn, day_bounds, snak_parts, validity, wd_time, wd_time_parts
 
 GREGORIAN = "http://www.wikidata.org/entity/Q1985727"
 
@@ -63,6 +63,13 @@ LABELS = {"entities": {
     "Q7": {"id": "Q7", "missing": ""}}}
 
 
+SPARQL_LABELS = {"results": {"bindings": [
+    {"e": {"type": "uri", "value": "http://www.wikidata.org/entity/P2348"},
+     "l": {"type": "literal", "xml:lang": "mul", "value": "time period"}},
+    {"e": {"type": "uri", "value": "http://www.wikidata.org/entity/P2348"},
+     "l": {"type": "literal", "xml:lang": "en", "value": "time period (en)"}}]}}
+
+
 def summary_corpus(root: Path, name: str, triples, retrieved_at: str) -> CorpusFile:
     c = CorpusFile(root / name / "corpus.sqlite", create=True, name=name, title="test summaries")
     bindings = [{"item": {"value": f"http://www.wikidata.org/entity/{s}"}, "pid": {"value": p},
@@ -79,6 +86,8 @@ def statements_corpus(root: Path, name: str, retrieved_at: str) -> CorpusFile:
     c.add("entities/batch-001.json", json.dumps(ENTITIES).encode(), url="https://www.wikidata.org/w/api.php",
           retrieved_at=retrieved_at)
     c.add("labels/batch-0001.json", json.dumps(LABELS).encode(), url="https://www.wikidata.org/w/api.php",
+          retrieved_at=retrieved_at)
+    c.add("labels/sparql-001.json", json.dumps(SPARQL_LABELS).encode(), url="https://query.wikidata.org/sparql",
           retrieved_at=retrieved_at)
     c.seal()
     return c
@@ -111,9 +120,28 @@ class ValueTests(unittest.TestCase):
 
     def test_validity_needs_one_known_value(self):
         start = snak("P580", time("+1900-00-00T00:00:00Z", 9), "time")
-        self.assertEqual(validity({"P580": [start]}), ("1900", None, 9))
-        self.assertEqual(validity({"P580": [start, start]}), (None, None, None))
-        self.assertEqual(validity({"P580": [snak("P580", None, "time", "somevalue")]}), (None, None, None))
+        self.assertEqual(validity({"P580": [start]}), ("1900", None, 9, _jdn(1900, 1, 1), None))
+        self.assertEqual(validity({"P580": [start, start]}), (None, None, None, None, None))
+        self.assertEqual(validity({"P580": [snak("P580", None, "time", "somevalue")]}),
+                         (None, None, None, None, None))
+
+    def test_day_bounds_sort_across_bce_and_follow_wikidata_centuries(self):
+        def bounds(t, p, cal=GREGORIAN):
+            return day_bounds(wd_time_parts(time(t, p, cal)["value"]))
+        self.assertEqual(_jdn(2000, 1, 1), 2451545)                              # the J2000 epoch day
+        self.assertEqual(_jdn(-4713, 11, 24), 0)                                 # JDN 0, proleptic Gregorian
+        self.assertEqual(bounds("+1900-00-00T00:00:00Z", 7), (_jdn(1801, 1, 1), _jdn(1900, 12, 31)))
+        self.assertEqual(bounds("+2000-00-00T00:00:00Z", 6), (_jdn(1001, 1, 1), _jdn(2000, 12, 31)))
+        self.assertEqual(bounds("-0500-00-00T00:00:00Z", 7), (_jdn(-499, 1, 1), _jdn(-400, 12, 31)))  # 5th c. BCE
+        self.assertEqual(bounds("-0001-00-00T00:00:00Z", 7), (_jdn(-99, 1, 1), _jdn(0, 12, 31)))      # 1st c. BCE
+        self.assertEqual(bounds("+1960-00-00T00:00:00Z", 8), (_jdn(1960, 1, 1), _jdn(1969, 12, 31)))
+        self.assertEqual(bounds("+2024-02-00T00:00:00Z", 10), (_jdn(2024, 2, 1), _jdn(2024, 2, 29)))  # leap
+        self.assertEqual(bounds("-13798000000-00-00T00:00:00Z", 3), (None, None))  # beyond calendar arithmetic
+        # text sorts BCE backwards; day numbers do not
+        a, b = bounds("-0500-00-00T00:00:00Z", 9), bounds("-0100-00-00T00:00:00Z", 9)
+        self.assertGreater(wd_time(time("-0500-00-00T00:00:00Z", 9)["value"])[0],
+                           wd_time(time("-0100-00-00T00:00:00Z", 9)["value"])[0])
+        self.assertLess(a[0], b[0])
 
 
 class ImportTests(unittest.TestCase):
@@ -154,7 +182,9 @@ class ImportTests(unittest.TestCase):
     def test_world_time(self):
         a, b = self.claim("Q1$AAA"), self.claim("Q1$BBB")
         self.assertEqual((a["valid_from"], a["valid_to"], a["time_precision"]), ("-0499", "1582-10-15", 9))
+        self.assertEqual((a["valid_from_day"], a["valid_to_day"]), (_jdn(-499, 1, 1), _jdn(1582, 10, 15)))
         self.assertEqual((b["valid_from"], b["valid_to"], b["time_precision"]), ("1905-06", "1905-06", 10))
+        self.assertEqual((b["valid_from_day"], b["valid_to_day"]), (_jdn(1905, 6, 1), _jdn(1905, 6, 30)))
 
     def test_qualifiers_and_references_are_rows(self):
         cid = self.claim("Q1$AAA")["id"]
@@ -179,6 +209,8 @@ class ImportTests(unittest.TestCase):
         labels = dict(self.conn.execute("SELECT id, label FROM concept WHERE id IN ('wd/Q2', 'wd/Q5', 'wd/Q7')"))
         self.assertEqual(labels["wd/Q5"], "Encyclopædia")                      # 'mul' when there is no English
         self.assertNotIn("wd/Q7", labels)                                      # missing entity: no row
+        p = self.conn.execute("SELECT label FROM concept WHERE id = 'wd/P2348'").fetchone()[0]
+        self.assertEqual(p, "time period (en)")                                # query-service rows: en first
 
     def test_summaries_of_covered_entities_are_superseded(self):
         rows = dict(self.conn.execute("SELECT subject, superseded_at FROM claim WHERE statement_id IS NULL"))

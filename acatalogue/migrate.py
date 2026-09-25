@@ -8,7 +8,7 @@ import sqlite3
 from . import ledger
 from .util import sha512_bytes
 
-LATEST = 2
+LATEST = 3
 
 
 def _has_table(conn: sqlite3.Connection, name: str) -> bool:
@@ -30,7 +30,33 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
     if version < 2:
         _v1_to_v2(conn)
         done.append("1->2")
+    if version < 3:
+        _v2_to_v3(conn)
+        done.append("2->3")
     return done
+
+
+def _v2_to_v3(conn: sqlite3.Connection) -> None:
+    """v3: integer day bounds on claims; review, baseline and audit tables (created by schema.sql).
+    Only columns are added: no row is rewritten."""
+    conn.execute("BEGIN")
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(claim)")}
+        added = [c for c in ("valid_from_day", "valid_to_day") if c not in cols]
+        for col in added:
+            conn.execute(f"ALTER TABLE claim ADD COLUMN {col} INTEGER")
+        n, digest = _rows_digest(conn, "SELECT id, subject, predicate, object, value, source_sha512, recorded_at"
+                                       " FROM claim ORDER BY id")
+        ledger.record(conn, "acat migrate", "migrate-schema", target="schema",
+                      detail={"from": 2, "to": 3, "claim_columns_added": added, "claims": n,
+                              "new_tables": ["review", "baseline", "audit_run", "audit_metric"]},
+                      receipt=f"claims-sha512:{digest}",
+                      undo="restore the database file from before the migration, or rebuild it from seed/ and corpora/")
+        conn.execute("PRAGMA user_version = 3")
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
 
 
 def _v1_to_v2(conn: sqlite3.Connection) -> None:
