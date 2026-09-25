@@ -1,16 +1,20 @@
 """Retrieval evaluation: can the catalogue find a concept from its name in a language it has hidden?
 
 Known-item queries. For each language L of a panel, every ACAT concept's preferred label in L is a
-query whose one relevant answer is that concept. While it runs, every label in L is hidden from the
-index (leave one language out), so a system must find the concept through the other languages.
-English is not in the panel: it is the language the catalogue is written in (and LSA is fit on it).
+query whose one relevant answer is that concept. While it runs, every label in L or in a variant of L
+(zh hides zh-hans, zh-tw …; de hides de-ch; kk hides kk-cyrl …) is left out of the index (leave one
+language out), so a system must find the concept through the other languages. Left out, not filtered:
+the lexical indexes are rebuilt without those labels, so they shape neither candidate lists nor bm25's
+document statistics. English is not in the panel: it is the language the catalogue is written in
+(and LSA is fit on it).
 
 Systems: FTS5 words (bm25), character-trigram similarity (cognates, transliterations), LSA fold-in,
-a dense multilingual model when its vectors exist, and reciprocal rank fusion (k = 60) of lexical
-systems alone and of all of them. Metrics: MRR@10, Recall@10 and nDCG@10 per language, their
-macro-average over languages and the worst language, with bootstrap 95% intervals (queries resampled
-within each language) and paired randomization tests. Every query and every rank is stored
-(eval_run, eval_query, eval_rank, eval_metric, eval_test) with the ledger head it describes.
+a dense multilingual model when its vectors exist, and reciprocal rank fusion (k = 60) of the two
+lexical systems (rrf-lexical) and of those two with the dense model (rrf-all; LSA is not fused).
+Metrics: MRR@10, Recall@10 and nDCG@10 per language, their macro-average over languages and the worst
+language, with bootstrap 95% intervals (queries resampled within each language) and paired
+randomization tests. Every query and every rank is stored (eval_run, eval_query, eval_rank,
+eval_metric, eval_test) with the ledger head it describes.
 """
 from __future__ import annotations
 
@@ -61,45 +65,90 @@ def _unique(ids) -> list[str]:
 # ─── systems: each maps a query to a ranked list of concept ids ─────────────
 
 
+INDEX_SQL = ("SELECT l.id, l.concept_id, l.lang, l.text FROM label l JOIN concept c ON c.id = l.concept_id"
+             " WHERE c.scheme = 'acat' AND c.status = 'active' AND l.kind IN ('pref', 'alt') ORDER BY l.id")
+HIDING = "the query language L and its variants (tags L-*): left out of every index, not filtered"
+
+
+def hidden(tag: str, lang: str) -> bool:
+    """Is a label tagged `tag` hidden while `lang` is the query language? zh hides zh-hans, zh-tw, …"""
+    return tag == lang or tag.startswith(lang + "-")
+
+
 class Lexical:
+    """FTS5 words (bm25) and character-trigram similarity over the index labels (every preferred and
+    alternative label of an active ACAT concept, as for every other system). `hide(lang)` rebuilds three
+    temporary FTS5 tables — with the tokenizers of label_fts, label_key and label_cjk — from the labels
+    that stay visible, so a hidden label is absent: it takes no candidate slot and counts in no statistic."""
+
+    WORDS_TOKENIZER = "unicode61 remove_diacritics 2 categories 'L* N* Co M*'"
+
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
+        self.labels = conn.execute(INDEX_SQL).fetchall()
+        self.concept = {r[0]: r[1] for r in self.labels}
+        self.text = {r[0]: nfc(r[3]) for r in self.labels}
+        self.keys = {i: fold_key(t) for i, t in self.text.items()}
+        self.cjk = {i: cjk_bigrams(t) for i, t in self.text.items() if has_cjk(t)}
+        self.lang: str | None = None
+        self.size = 0
+
+    def hide(self, lang: str) -> int:
+        """Rebuild the indexes without `lang` and its variants; returns the number of labels left in."""
+        if lang == self.lang:
+            return self.size
+        c = self.conn
+        for t in ("ev_words", "ev_key", "ev_cjk"):
+            c.execute(f"DROP TABLE IF EXISTS temp.{t}")
+        c.execute(f"CREATE VIRTUAL TABLE temp.ev_words USING fts5(text, tokenize=\"{self.WORDS_TOKENIZER}\")")
+        c.execute("CREATE VIRTUAL TABLE temp.ev_key USING fts5(k, content='', detail=full,"
+                  " tokenize='trigram case_sensitive 1')")
+        c.execute("CREATE VIRTUAL TABLE temp.ev_cjk USING fts5(k, content='', detail=full,"
+                  " tokenize=\"unicode61 categories 'L* N* Co M*'\")")
+        visible = [r for r in self.labels if not hidden(r[2], lang)]
+        c.executemany("INSERT INTO temp.ev_words(rowid, text) VALUES (?, ?)", [(r[0], r[3]) for r in visible])
+        c.executemany("INSERT INTO temp.ev_key(rowid, k) VALUES (?, ?)", [(r[0], self.keys[r[0]]) for r in visible])
+        c.executemany("INSERT INTO temp.ev_cjk(rowid, k) VALUES (?, ?)",
+                      [(r[0], self.cjk[r[0]]) for r in visible if r[0] in self.cjk])
+        c.commit()                                  # temp tables only: ends the implicit transaction
+        self.lang, self.size = lang, len(visible)
+        return self.size
+
+    def _check(self, q: dict) -> None:
+        if self.lang != q["lang"]:
+            raise RuntimeError(f"the index hides {self.lang!r}; call hide({q['lang']!r}) first")
 
     def words(self, q: dict) -> list[str]:
+        self._check(q)
         toks = tokens(q["text"])[:32]
         if not toks:
             return []
         match = " OR ".join('"' + t.replace('"', '""') + '"' for t in toks)
-        rows = self.conn.execute(
-            "SELECT concept_id FROM label_fts WHERE label_fts MATCH ? AND lang <> ? AND kind IN ('pref', 'alt')"
-            " AND concept_id LIKE 'acat/%' ORDER BY bm25(label_fts) LIMIT 1000", (match, q["lang"])).fetchall()
-        return _unique(r[0] for r in rows)
+        rows = self.conn.execute("SELECT rowid FROM temp.ev_words WHERE ev_words MATCH ?"
+                                 " ORDER BY bm25(ev_words), rowid LIMIT 1000", (match,)).fetchall()
+        return _unique(self.concept[r[0]] for r in rows)
 
     def trigram(self, q: dict) -> list[str]:
         """Jaccard similarity of character trigrams of the case keys (pairs for CJK text)."""
+        self._check(q)
         text = nfc(q["text"])
         if has_cjk(text):
             grams = set(cjk_bigrams(text).split())
-            table, gram_of = "label_cjk", lambda s: set(cjk_bigrams(s).split())
+            table, gram_of = "ev_cjk", lambda i: set(self.cjk[i].split())
         else:
             key = fold_key(text)
             grams = {key[i:i + 3] for i in range(len(key) - 2)}
-            table, gram_of = "label_key", lambda s: {k[i:i + 3] for k in (fold_key(s),) for i in range(len(k) - 2)}
+            table, gram_of = "ev_key", lambda i: {k[j:j + 3] for k in (self.keys[i],) for j in range(len(k) - 2)}
         if not grams:
             return []
         match = " OR ".join('"' + g.replace('"', '""') + '"' for g in sorted(grams)[:64])
-        # the candidate cap applies before the hidden language is removed (the contentless index has no
-        # language column): the query's own language can only take candidate slots, never add a match
-        rows = self.conn.execute(
-            f"SELECT l.concept_id, l.text FROM (SELECT rowid AS id FROM {table} WHERE {table} MATCH ?"
-            f" ORDER BY rank LIMIT 3000) m JOIN label l ON l.id = m.id"
-            f" WHERE l.lang <> ? AND l.kind IN ('pref', 'alt') AND l.concept_id LIKE 'acat/%'",
-            (match, q["lang"])).fetchall()
+        rows = self.conn.execute(f"SELECT rowid FROM temp.{table} WHERE {table} MATCH ? ORDER BY rank, rowid"
+                                 " LIMIT 3000", (match,)).fetchall()
         scored = []
-        for cid, t in rows:
-            g = gram_of(nfc(t))
+        for (i,) in rows:
+            g = gram_of(i)
             if g:
-                scored.append((len(grams & g) / len(grams | g), cid))
+                scored.append((len(grams & g) / len(grams | g), self.concept[i]))
         scored.sort(key=lambda x: (-x[0], x[1]))
         return _unique(cid for s, cid in scored if s > 0)
 
@@ -142,9 +191,11 @@ class Dense:
         self.lang = np.array([meta[i][1] for i in ids], dtype=object)
         enc = Encoder(name)
         self.Q = enc.encode([q["text"] for q in qs], query=True)
+        self.row = {q["qid"]: k for k, q in enumerate(qs)}      # query id -> row of Q
 
     def rank_all(self, qs: list[dict]) -> list[list[str]]:
-        """Scores for a block of queries in one product; the query language's labels are set to -inf."""
+        """Scores for a block of queries in one product; labels in the query language or a variant of it
+        are set to -inf (a cosine does not depend on the other labels, so this equals leaving them out)."""
         import numpy as np
         out: list[list[str]] = [[] for _ in qs]
         by_lang: dict[str, list[int]] = defaultdict(list)
@@ -153,11 +204,11 @@ class Dense:
         n = self.M.shape[0]
         keep = min(1500, n)                              # the same cut-off whatever the index size
         for lang, ks in by_lang.items():
-            hidden = self.lang == lang
+            mask = np.array([hidden(t, lang) for t in self.lang], dtype=bool)
             for start in range(0, len(ks), 256):
                 block = ks[start:start + 256]
-                S = self.Q[block] @ self.M.T
-                S[:, hidden] = -np.inf
+                S = self.Q[[self.row[qs[k]["qid"]] for k in block]] @ self.M.T
+                S[:, mask] = -np.inf
                 top = (np.argpartition(-S, keep - 1, axis=1)[:, :keep] if keep < n
                        else np.tile(np.arange(n), (len(block), 1)))
                 for row, k in enumerate(block):
@@ -240,18 +291,36 @@ def paired_test(qs: list[dict], a: dict[int, int | None], b: dict[int, int | Non
 
 def run(conn: sqlite3.Connection, langs: tuple[str, ...] = PANEL, systems: tuple[str, ...] | None = None,
         boot: int = 1000, perms: int = 10000, actor: str = "acat eval", progress=print) -> dict:
+    """Rank, score and test in memory, then store the run in one short write transaction (a concurrent
+    writer, such as `acat embed`, waits a moment instead of failing)."""
     qs = queries(conn, langs)
-    lex = Lexical(conn)
     have_dense = conn.execute("SELECT 1 FROM model WHERE id LIKE 'dense/%' LIMIT 1").fetchone() is not None
     systems = systems or tuple(s for s in ("words", "trigram", "lsa", "dense", "rrf-lexical", "rrf-all")
                                if have_dense or s not in ("dense", "rrf-all"))
+    by_lang: dict[str, list[int]] = defaultdict(list)
+    for k, q in enumerate(qs):
+        by_lang[q["lang"]].append(k)
     results: dict[str, list[list[str]]] = {}
-    if "words" in systems or "rrf-lexical" in systems or "rrf-all" in systems:
-        results["words"] = [lex.words(q) for q in qs]
-        progress(f"  words: {len(qs)} queries")
-    if "trigram" in systems or "rrf-lexical" in systems or "rrf-all" in systems:
-        results["trigram"] = [lex.trigram(q) for q in qs]
-        progress(f"  trigram: {len(qs)} queries")
+    want_words = {"words", "rrf-lexical", "rrf-all"} & set(systems)
+    want_tri = {"trigram", "rrf-lexical", "rrf-all"} & set(systems)
+    index_size: dict[str, int] = {}
+    if want_words or want_tri:
+        lex = Lexical(conn)
+        words: list[list[str]] = [[] for _ in qs]
+        tri: list[list[str]] = [[] for _ in qs]
+        for lang, ks in by_lang.items():
+            index_size[lang] = lex.hide(lang)
+            for k in ks:
+                if want_words:
+                    words[k] = lex.words(qs[k])
+                if want_tri:
+                    tri[k] = lex.trigram(qs[k])
+        if want_words:
+            results["words"] = words
+            progress(f"  words: {len(qs)} queries")
+        if want_tri:
+            results["trigram"] = tri
+            progress(f"  trigram: {len(qs)} queries")
     if "lsa" in systems:
         lsa = Lsa(conn)
         results["lsa"] = [lsa.rank(q) for q in qs]
@@ -270,38 +339,40 @@ def run(conn: sqlite3.Connection, langs: tuple[str, ...] = PANEL, systems: tuple
 
     ranks = {s: {q["qid"]: (r.index(q["target"]) + 1 if q["target"] in r else None) for q, r in zip(qs, rs)}
              for s, rs in results.items()}
-    params = {"langs": list(langs), "k": K, "depth": DEPTH, "rrf_k": RRF_K, "seed": SEED, "bootstrap": boot,
-              "permutations": perms, "systems": list(results), "dense_model": dense_model,
-              "index": "ACAT preferred and alternative labels (the same for every system but LSA, which is "
-                       "fit on English concept text), every label in the query's language hidden",
-              "queries": "each ACAT concept's preferred label in each panel language; one relevant answer"}
-    cur = conn.execute("INSERT INTO eval_run(at, ledger_head, params) VALUES (?,?,?)",
-                       (utcnow(), ledger.head(conn), json.dumps(params, sort_keys=True)))
-    run_id = cur.lastrowid
-    conn.executemany("INSERT INTO eval_query(run_id, qid, lang, text, target) VALUES (?,?,?,?,?)",
-                     [(run_id, q["qid"], q["lang"], q["text"], q["target"]) for q in qs])
-    summary: dict[str, dict] = {}
-    for s in results:
-        conn.executemany("INSERT INTO eval_rank(run_id, system, qid, rank) VALUES (?,?,?,?)",
-                         [(run_id, s, qid, r) for qid, r in ranks[s].items()])
-        rows = summarize(qs, ranks[s], SEED, boot)
-        conn.executemany("INSERT INTO eval_metric(run_id, system, lang, metric, value, lo, hi, n) VALUES (?,?,?,?,?,?,?,?)",
-                         [(run_id, s, *r) for r in rows])
-        summary[s] = {"rows": rows}
-    tests = []
+    summary = {s: {"rows": summarize(qs, ranks[s], SEED, boot)} for s in results}
     pairs = [("rrf-lexical", "words"), ("trigram", "words"), ("lsa", "words"), ("dense", "words"),
              ("dense", "rrf-lexical"), ("rrf-all", "dense"), ("rrf-all", "rrf-lexical")]
-    for a, b in pairs:
-        if a in ranks and b in ranks:
-            t = paired_test(qs, ranks[a], ranks[b], perms, SEED)
+    tests = [{"a": a, "b": b, **paired_test(qs, ranks[a], ranks[b], perms, SEED)}
+             for a, b in pairs if a in ranks and b in ranks]
+    asked = list(langs)
+    answered = [lang for lang in asked if lang in by_lang]
+    params = {"langs": asked, "langs_with_queries": answered, "k": K, "depth": DEPTH, "rrf_k": RRF_K,
+              "seed": SEED, "bootstrap": boot, "permutations": perms, "systems": list(results),
+              "fused": {"rrf-lexical": ["words", "trigram"], "rrf-all": ["words", "trigram", "dense"]},
+              "dense_model": dense_model, "hidden": HIDING, "index_labels_left_in": index_size,
+              "index": "ACAT preferred and alternative labels of active concepts (the same for every system but "
+                       "LSA, which is fit on English concept text)",
+              "queries": "each ACAT concept's preferred label in each panel language; one relevant answer"}
+
+    with conn:                                    # one short write transaction
+        cur = conn.execute("INSERT INTO eval_run(at, ledger_head, params) VALUES (?,?,?)",
+                           (utcnow(), ledger.head(conn), json.dumps(params, sort_keys=True)))
+        run_id = cur.lastrowid
+        conn.executemany("INSERT INTO eval_query(run_id, qid, lang, text, target) VALUES (?,?,?,?,?)",
+                         [(run_id, q["qid"], q["lang"], q["text"], q["target"]) for q in qs])
+        for s in results:
+            conn.executemany("INSERT INTO eval_rank(run_id, system, qid, rank) VALUES (?,?,?,?)",
+                             [(run_id, s, qid, r) for qid, r in ranks[s].items()])
+            conn.executemany("INSERT INTO eval_metric(run_id, system, lang, metric, value, lo, hi, n)"
+                             " VALUES (?,?,?,?,?,?,?,?)", [(run_id, s, *r) for r in summary[s]["rows"]])
+        for t in tests:
             conn.execute("INSERT INTO eval_test(run_id, a, b, metric, diff, p, permutations) VALUES (?,?,?,?,?,?,?)",
-                         (run_id, a, b, "mrr@10 (macro)", t["diff"], t["p"], perms))
-            tests.append({"a": a, "b": b, **t})
-    ledger.record(conn, actor, "eval-retrieval", target=f"eval_run/{run_id}",
-                  detail={"queries": len(qs), "langs": len(langs), "systems": list(results),
-                          "macro_mrr@10": {s: round(next(r[2] for r in v["rows"] if r[0] == "" and r[1] == "mrr@10"), 4)
-                                           for s, v in summary.items()}},
-                  receipt=f"ledger-head:{ledger.head(conn)[:32]}",
-                  undo="evaluation runs are measurements; later runs are added beside them")
-    conn.commit()
-    return {"run_id": run_id, "queries": len(qs), "summary": summary, "tests": tests, "params": params}
+                         (run_id, t["a"], t["b"], "mrr@10 (macro)", t["diff"], t["p"], perms))
+        ledger.record(conn, actor, "eval-retrieval", target=f"eval_run/{run_id}",
+                      detail={"queries": len(qs), "langs": len(answered), "panel": len(asked), "systems": list(results),
+                              "macro_mrr@10": {s: round(next(r[2] for r in v["rows"] if r[0] == "" and r[1] == "mrr@10"), 4)
+                                               for s, v in summary.items()}},
+                      receipt=f"ledger-head:{ledger.head(conn)[:32]}",
+                      undo="evaluation runs are measurements; later runs are added beside them")
+    return {"run_id": run_id, "queries": len(qs), "langs": answered, "summary": summary, "tests": tests,
+            "params": params}

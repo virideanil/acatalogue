@@ -53,19 +53,23 @@ def check_sqlite() -> None:
         probe.close()
 
 
+BUSY_TIMEOUT = 60.0      # seconds a connection waits for another writer's transaction before failing
+
+
 def connect(path: str | Path = DEFAULT_DB, *, readonly: bool = False, create: bool = False) -> sqlite3.Connection:
-    """Open the catalogue. Read-only connections cannot write even by accident."""
+    """Open the catalogue. Read-only connections cannot write even by accident. Writers wait up to
+    BUSY_TIMEOUT for each other (sqlite3's default of 5 s is shorter than an evaluation's commit)."""
     path = Path(path)
     if readonly:
         if not path.exists():
             raise FileNotFoundError(f"{path} does not exist — run `acat build` first")
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False, timeout=BUSY_TIMEOUT)
         conn.execute("PRAGMA query_only = 1")
     else:
         if not path.exists() and not create:
             raise FileNotFoundError(f"{path} does not exist — run `acat build` first")
         path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(path)
+        conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT)
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA synchronous = NORMAL")
     conn.row_factory = sqlite3.Row

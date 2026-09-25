@@ -289,9 +289,9 @@ def evidence(conn: sqlite3.Connection) -> dict:
 def review_coverage(conn: sqlite3.Connection) -> dict:
     """Who decided each accepted crosswalk. An AI agent's decision is a proposal until a person reviews it."""
     by: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    for reviewer, relation, n in conn.execute(
-            "SELECT reviewer, relation, count(*) FROM mapping WHERE status = 'accepted' GROUP BY 1, 2"):
-        by[reviewer_kind(reviewer)][relation] += n
+    for reviewer, method, relation, n in conn.execute(
+            "SELECT reviewer, method, relation, count(*) FROM mapping WHERE status = 'accepted' GROUP BY 1, 2, 3"):
+        by[reviewer_kind(reviewer, method)][relation] += n
     human_reviews = conn.execute("SELECT count(*) FROM review WHERE reviewer_kind = 'human'").fetchone()[0] \
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'review'").fetchone() else 0
     return {"accepted_by_decider": {k: dict(v) for k, v in sorted(by.items())}, "human_reviews": human_reviews}

@@ -350,6 +350,10 @@ def cmd_review(args) -> int:
         if not args.reviewer:
             print("acat review: --reviewer is required (the person deciding)", file=sys.stderr)
             return 2
+        if args.human == args.agent:
+            print("acat review: say who decides: --human (a person) or --agent (an AI agent; recorded, never"
+                  " decisive)", file=sys.stderr)
+            return 2
         if not any(d["from"] == args.frm and d["to"] == args.to for d in decisions):
             print(f"acat review: no proposal {args.frm} -> {args.to} in {wikidata.DECISIONS.name}", file=sys.stderr)
             return 2
@@ -391,7 +395,7 @@ def cmd_review(args) -> int:
             print(f"      ours:     {ours[1][:150]}")
         print(f"      Wikidata: {desc[:150] or '(no English description)'}; {editions} Wikipedia editions")
         print(f"      proposed by {d['reviewer']} via {d['method']}" + (f": {d['note']}" if d["note"] else ""))
-        print(f"      acat review approve {d['from']} {d['to']} --reviewer \"<your name>\"\n")
+        print(f"      acat review approve {d['from']} {d['to']} --reviewer \"<your name>\" --human\n")
     return 0
 
 
@@ -402,8 +406,10 @@ def cmd_eval(args) -> int:
     langs = tuple(args.langs.split(",")) if args.langs else PANEL
     systems = tuple(args.systems.split(",")) if args.systems else None
     res = run(conn, langs, systems, boot=args.boot, perms=args.perms)
-    print(f"\nrun {res['run_id']}: {res['queries']} known-item queries in {len(langs)} languages, each language hidden"
-          " from the index while its queries run (95% bootstrap intervals)")
+    missing = [lang for lang in langs if lang not in res["langs"]]
+    print(f"\nrun {res['run_id']}: {res['queries']} known-item queries in {len(res['langs'])} languages, each language"
+          " and its variants left out of the index while its queries run (95% bootstrap intervals)"
+          + (f"; no queries in {', '.join(missing)}" if missing else ""))
     print(f"{'system':12s} {'MRR@10':>22s} {'Recall@10':>10s} {'nDCG@10':>8s}  worst language")
     for s, v in res["summary"].items():
         macro = {m: (val, lo, hi) for lang, m, val, lo, hi, n in v["rows"] if lang == ""}
@@ -578,6 +584,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--relation", help="revise: the relation it should have; queue: only this relation")
     p.add_argument("--perspective", help="your declared perspective, tradition or region (optional)")
     p.add_argument("--rationale", help="why (required to revise or object)")
+    p.add_argument("--human", action="store_true", help="the reviewer is a person (their decision applies)")
     p.add_argument("--agent", action="store_true", help="the reviewer is an AI agent (recorded, never decisive)")
     p.add_argument("--under", help="queue: only concepts under this one")
     p.add_argument("-n", "--limit", type=int, default=10)

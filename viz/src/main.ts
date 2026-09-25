@@ -506,6 +506,7 @@ class App {
     this.neighbors = null;
     this.nodeAbort?.abort();
     this.ui.clearInspector();
+    this.ui.clearTreeSelection();
     this.kick();
   }
 

@@ -97,7 +97,7 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
         "facets": labelled("SELECT f.facet_id, c.label FROM facet f JOIN concept c ON c.id = f.facet_id"
                            " WHERE f.concept_id = ? ORDER BY f.facet_id", (cid,)),
         "mappings": [{"id": r[0], "label": r[1], "relation": r[2], "method": r[3], "status": r[4], "reviewer": r[5],
-                      "decided_by": reviewer_kind(r[5]), "note": r[6]}
+                      "decided_by": reviewer_kind(r[5], r[3]), "note": r[6]}
                      for r in conn.execute(
                          "SELECT m.to_id, coalesce(c.label, m.to_id), m.relation, m.method, m.status, m.reviewer, m.note"
                          " FROM mapping m LEFT JOIN concept c ON c.id = m.to_id WHERE m.from_id = ?"

@@ -145,10 +145,15 @@ class StoredResponsesTests(unittest.TestCase):
         checked = 0
         for path in list_corpora():
             c = CorpusFile(path, readonly=True)
-            if not c.name.startswith(("wikidata-", "wikipedia-")):
+            if not c.name.startswith(("wikidata-", "wikipedia-", "worldbank-")):
                 continue
             for it in c.items():
-                check = sparql_check if it["name"].startswith("sparql/") else mediawiki_check
+                if c.name.startswith("worldbank-"):
+                    from acatalogue.sources.worldbank import worldbank_check as check
+                elif it["name"].startswith(("sparql/", "labels/sparql-")):   # query-service responses
+                    check = sparql_check
+                else:
+                    check = mediawiki_check
                 verdict, _, message = check(c.get(it["name"]))
                 self.assertEqual(verdict, "ok", f"{c.name}:{it['name']}: {message}")
                 checked += 1

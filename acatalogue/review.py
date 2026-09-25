@@ -41,6 +41,9 @@ def row_problems(r: dict, where: str) -> list[str]:
         out.append(f"{where}: a relation goes only with 'revise' and must be one of {', '.join(RELATIONS)}")
     if not r["reviewer"] or r["reviewer_kind"] not in ("human", "agent"):
         out.append(f"{where}: a named reviewer and reviewer_kind human|agent are required")
+    elif r["reviewer_kind"] == "human" and reviewer_kind(r["reviewer"]) == "AI agent":
+        out.append(f"{where}: '{r['reviewer']}' names an AI agent; an agent's review is recorded with"
+                   " reviewer_kind agent (it never decides)")
     if not _ISO.fullmatch(r["decided_at"]):
         out.append(f"{where}: decided_at must be UTC like 2026-09-25T18:00:00Z")
     if r["decision"] in ("revise", "object") and not r["rationale"]:
@@ -133,9 +136,10 @@ def slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "reviewer"
 
 
-def append(reviewer: str, target: str, decision: str, *, relation: str = "", kind: str = "human",
+def append(reviewer: str, target: str, decision: str, *, kind: str, relation: str = "",
            perspective: str = "", rationale: str = "", directory: Path | None = None) -> Path:
-    """Append one decision to the reviewer's file (created with its header if new)."""
+    """Append one decision to the reviewer's file (created with its header if new). `kind` (human or agent)
+    has no default: who decides is stated, never assumed."""
     row = dict(zip(COLUMNS, [target, decision, relation, reviewer, kind, perspective, utcnow(), rationale]))
     problems = row_problems(row, "new review")
     if problems:
@@ -151,8 +155,13 @@ def append(reviewer: str, target: str, decision: str, *, relation: str = "", kin
     return path
 
 
-def reviewer_kind(reviewer: str | None) -> str:
-    """Who stands behind a crosswalk decision, read from its reviewer field."""
+def reviewer_kind(reviewer: str | None, method: str | None = "") -> str:
+    """Who stands behind a crosswalk decision. A person's decision is known from the data: the build marks
+    a mapping that a human review decided with `+human-` in its method. Otherwise the reviewer field is
+    read: an agent names itself as one, 'seed' is the seed file, and any other name is 'unknown' — people
+    record their decisions in seed/reviews/ with an explicit kind, so a bare name is not taken for a person."""
+    if "+human-" in (method or ""):
+        return "human"
     r = (reviewer or "").lower()
     if not r:
         return "none"
@@ -160,4 +169,4 @@ def reviewer_kind(reviewer: str | None) -> str:
         return "seed file (no named reviewer)"
     if "ai agent" in r or r.startswith("claude"):
         return "AI agent"
-    return "human"
+    return "unknown"

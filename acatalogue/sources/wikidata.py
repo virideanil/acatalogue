@@ -502,20 +502,29 @@ def _julian_to_gregorian(year: int, month: int, day: int) -> tuple[int, int, int
     return 100 * b + d - 4800 + m // 10, m + 3 - 12 * (m // 10), e - (153 * m + 2) // 5 + 1
 
 
-def wd_time_parts(v: dict) -> tuple[int, int, int, int] | None:
-    """A Wikidata time value as (year, month, day, precision) in the proleptic Gregorian calendar with
-    astronomical years (1 BCE = 0), cut to what the value states. The JSON counts 1 BCE as -0001, so
-    negative years shift by one. Day-precision Julian dates are converted; a Julian month cannot be named
-    in the Gregorian calendar, so it is cut to its year. Precisions coarser than a year keep their code."""
+def _raw_time(v: dict) -> tuple[int, int, int, int, bool] | None:
+    """(astronomical year, month, day, precision, stated in the Julian calendar?) of a Wikidata time value,
+    as stated. The JSON counts 1 BCE as -0001, so negative years shift by one."""
     m = _TIME.match(v.get("time", ""))
     if not m:
         return None
     sign, y, mo, d = m.groups()
-    year, month, day = int(y), int(mo), int(d)
+    year = int(y)
     if sign == "-":
         year = 1 - year
-    prec = int(v.get("precision", 9))
-    julian = v.get("calendarmodel") == JULIAN
+    return year, int(mo), int(d), int(v.get("precision", 9)), v.get("calendarmodel") == JULIAN
+
+
+def wd_time_parts(v: dict) -> tuple[int, int, int, int] | None:
+    """A Wikidata time value as (year, month, day, precision) with astronomical years (1 BCE = 0), cut to
+    what the value states. Day-precision Julian dates are converted to the proleptic Gregorian calendar;
+    a Julian month cannot be named in the Gregorian calendar, so it is cut to its year, and a Julian year
+    keeps its number (its days are counted in its own calendar by time_bounds). Precisions coarser than a
+    year keep their code."""
+    r = _raw_time(v)
+    if r is None:
+        return None
+    year, month, day, prec, julian = r
     if prec >= 11 and month and day and not (julian and year < -4700):
         if julian:
             year, month, day = _julian_to_gregorian(year, month, day)
@@ -549,13 +558,25 @@ def _jdn(year: int, month: int, day: int) -> int:
     return day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
 
 
+def _jdn_julian(year: int, month: int, day: int) -> int:
+    """Julian Day Number of a Julian-calendar date (astronomical year)."""
+    a = (14 - month) // 12
+    y, m = year + 4800 - a, month + 12 * a - 3
+    return day + (153 * m + 2) // 5 + 365 * y + y // 4 - 32083
+
+
 def _year_span(year: int, prec: int) -> tuple[int, int] | None:
-    """First and last astronomical year a year of this precision covers. Decades run 1960-1969;
-    centuries and millennia count as Wikidata does (1900 at century precision is 1801-1900)."""
+    """First and last astronomical year a year of this precision covers. Decades run 1960-1969 and, before
+    the common era, count down the way their names do (the 1000s BCE are 1009-1000 BCE; the decades next to
+    the missing year zero are 9-1 BCE and 1-9 CE); centuries and millennia count as Wikidata does (1900 at
+    century precision is 1801-1900)."""
     if prec >= 9:
         return year, year
     if prec == 8:
-        return year // 10 * 10, year // 10 * 10 + 9
+        if year > 0:
+            return max(year // 10 * 10, 1), year // 10 * 10 + 9
+        d = (1 - year) // 10 * 10                  # the decade in historical BCE years
+        return 1 - (d + 9), 1 - max(d, 1)
     if prec in (6, 7):
         size = 100 if prec == 7 else 1000
         if year > 0:
@@ -566,18 +587,36 @@ def _year_span(year: int, prec: int) -> tuple[int, int] | None:
     return None
 
 
-def day_bounds(parts: tuple[int, int, int, int]) -> tuple[int | None, int | None]:
-    """(first, last) Julian Day Number of the interval a time value of its precision covers."""
+def day_bounds(parts: tuple[int, int, int, int], julian: bool = False) -> tuple[int | None, int | None]:
+    """(first, last) Julian Day Number of the interval a time value of its precision covers, counted in the
+    calendar it was stated in (a Julian year begins about ten days after the Gregorian year of its number)."""
     year, month, day, prec = parts
+    jdn = _jdn_julian if julian else _jdn
+    if prec >= 10 and year < -4700:
+        return None, None
     if prec >= 11:
-        return _jdn(year, month, day), _jdn(year, month, day)
+        return jdn(year, month, day), jdn(year, month, day)
     if prec == 10:
         nxt = (year + 1, 1) if month == 12 else (year, month + 1)
-        return _jdn(year, month, 1), _jdn(*nxt, 1) - 1
+        return jdn(year, month, 1), jdn(*nxt, 1) - 1
     span = _year_span(year, prec)
     if span is None or span[0] < -4700:
         return None, None
-    return _jdn(span[0], 1, 1), _jdn(span[1] + 1, 1, 1) - 1
+    return jdn(span[0], 1, 1), jdn(span[1] + 1, 1, 1) - 1
+
+
+def time_bounds(v: dict) -> tuple[int | None, int | None]:
+    """Day bounds of a Wikidata time value exactly as stated: at its precision, in its own calendar (so a
+    Julian month keeps its exact days even though its text is cut to the year)."""
+    r = _raw_time(v)
+    if r is None:
+        return None, None
+    year, month, day, prec, julian = r
+    if prec >= 11 and not (month and day):
+        prec = 10 if month else 9
+    if prec == 10 and not month:
+        prec = 9
+    return day_bounds((year, month, day, min(prec, 11)), julian=julian)
 
 
 def snak_parts(s: dict) -> tuple[str, str | None, str | None, str | None]:
@@ -598,18 +637,20 @@ def validity(qualifiers: dict) -> tuple[str | None, str | None, int | None, int 
     """World time of a statement from its start time (P580), end time (P582) or point in time (P585)
     qualifiers, only when each is a single known value; everything else stays in claim_qualifier.
     Returns (from text, to text, coarsest precision, first day, last day) with Julian Day Numbers."""
-    def one(pid: str) -> tuple[int, int, int, int] | None:
+    def one(pid: str):
         snaks = qualifiers.get(pid, [])
         if len(snaks) != 1 or snaks[0]["snaktype"] != "value" or snaks[0]["datavalue"]["type"] != "time":
             return None
-        return wd_time_parts(snaks[0]["datavalue"]["value"])
+        v = snaks[0]["datavalue"]["value"]
+        parts = wd_time_parts(v)
+        return None if parts is None else (parts, time_bounds(v))
     start, end, point = one("P580"), one("P582"), one("P585")
     if point and not (start or end):
         start = end = point
-    precisions = [p[3] for p in (start, end) if p]
-    return (format_time(start) if start else None, format_time(end) if end else None,
+    precisions = [p[0][3] for p in (start, end) if p]
+    return (format_time(start[0]) if start else None, format_time(end[0]) if end else None,
             min(precisions) if precisions else None,
-            day_bounds(start)[0] if start else None, day_bounds(end)[1] if end else None)
+            start[1][0] if start else None, end[1][1] if end else None)
 
 
 def _pointer(*parts: str | int) -> str:
@@ -644,7 +685,7 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
                 cur = conn.execute("INSERT INTO concept(id, scheme, code, label, source_sha512) VALUES (?,?,?,?,?)"
                                    " ON CONFLICT(id) DO NOTHING", (f"wd/{eid}", "wd", eid, nfc(text), digest))
                 stats["labelled"] += cur.rowcount
-    covered: set[str] = set()
+    covered: set[tuple[str, str]] = set()      # (entity, retrieval time of a batch that holds it)
     for it in corpus.items():
         if not it["name"].startswith("entities/"):
             continue
@@ -655,7 +696,7 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
                 stats["missing"] += 1
                 continue
             stats["entities"] += 1
-            covered.add(f"wd/{qid}")
+            covered.add((f"wd/{qid}", recorded))
             for pid, statements in ent.get("claims", {}).items():
                 for i, st in enumerate(statements):
                     kind, obj, value, dt = snak_parts(st["mainsnak"])
@@ -687,21 +728,22 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
                         conn.executemany("INSERT OR IGNORE INTO claim_reference(claim_id, ref_hash, ord, property,"
                                          " snak_type, object, value, datatype) VALUES (?,?,?,?,?,?,?,?)", rows)
                         stats["references"] += 1
-    # record time moves on for the covered entities: their WDQS summaries and any older statement corpus
-    # are superseded as of this corpus (a summary retrieved later than this corpus is left current)
-    now = corpus_time(corpus, "entities/")
-    conn.execute("CREATE TEMP TABLE IF NOT EXISTS _covered(id TEXT PRIMARY KEY)")
-    conn.execute("DELETE FROM _covered")
-    conn.executemany("INSERT INTO _covered(id) VALUES (?)", [(c,) for c in sorted(covered)])
+    # record time moves on for the covered entities, each as of the batch that read it: their WDQS
+    # summaries recorded no later than that reading, and any older statement corpus, are superseded then
+    conn.execute("DROP TABLE IF EXISTS temp._covered")
+    conn.execute("CREATE TEMP TABLE _covered(id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (id, at))")
+    conn.executemany("INSERT INTO _covered(id, at) VALUES (?, ?)", sorted(covered))
     stats["superseded_summaries"] = conn.execute(
-        "UPDATE claim SET superseded_at = ? WHERE superseded_at IS NULL AND statement_id IS NULL"
-        " AND recorded_at <= ? AND subject IN (SELECT id FROM _covered) AND source_sha512 IN"
-        " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%' AND name LIKE '%:sparql/claims-%')",
-        (now, now)).rowcount
+        "UPDATE claim SET superseded_at = (SELECT min(c.at) FROM _covered c WHERE c.id = claim.subject"
+        " AND c.at >= claim.recorded_at) WHERE superseded_at IS NULL AND statement_id IS NULL"
+        " AND EXISTS (SELECT 1 FROM _covered c WHERE c.id = claim.subject AND c.at >= claim.recorded_at)"
+        " AND source_sha512 IN (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%'"
+        " AND name LIKE '%:sparql/claims-%')").rowcount
     stats["superseded_statements"] = conn.execute(
-        "UPDATE claim SET superseded_at = ? WHERE superseded_at IS NULL AND subject IN (SELECT id FROM _covered)"
-        " AND source_sha512 IN (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-statements-%' AND corpus < ?)",
-        (now, corpus.name)).rowcount
+        "UPDATE claim SET superseded_at = (SELECT min(c.at) FROM _covered c WHERE c.id = claim.subject)"
+        " WHERE superseded_at IS NULL AND subject IN (SELECT id FROM _covered) AND source_sha512 IN"
+        " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-statements-%' AND corpus < ?)",
+        (corpus.name,)).rowcount
     ledger.record(conn, actor, "import-wikidata-statements", target=f"doc/{corpus.name}", detail=stats,
                   receipt=f"manifest:{corpus.manifest()}",
                   undo="claims are never deleted; superseded rows keep their text and source, and a later "

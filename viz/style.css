@@ -162,6 +162,17 @@ button.ghost:hover {
   background: var(--hairline);
 }
 
+/* a toggle button keeps its label; its state shows as pressed (filled, with a mark) */
+button.ghost[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
+
+button.ghost[aria-pressed="true"]::before {
+  content: "■ ";
+}
+
 .mobile-only {
   display: none;
 }

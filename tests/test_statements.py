@@ -8,7 +8,8 @@ from pathlib import Path
 from acatalogue import db as dbm, ledger
 from acatalogue.corpusfile import CorpusFile
 from acatalogue.sources import wikidata
-from acatalogue.sources.wikidata import JULIAN, _jdn, day_bounds, snak_parts, validity, wd_time, wd_time_parts
+from acatalogue.sources.wikidata import (JULIAN, _jdn, _jdn_julian, day_bounds, snak_parts, time_bounds, validity,
+                                         wd_time, wd_time_parts)
 
 GREGORIAN = "http://www.wikidata.org/entity/Q1985727"
 
@@ -137,11 +138,30 @@ class ValueTests(unittest.TestCase):
         self.assertEqual(bounds("+1960-00-00T00:00:00Z", 8), (_jdn(1960, 1, 1), _jdn(1969, 12, 31)))
         self.assertEqual(bounds("+2024-02-00T00:00:00Z", 10), (_jdn(2024, 2, 1), _jdn(2024, 2, 29)))  # leap
         self.assertEqual(bounds("-13798000000-00-00T00:00:00Z", 3), (None, None))  # beyond calendar arithmetic
+        # decades before the common era count down like their names: the 1000s BCE are 1009-1000 BCE
+        self.assertEqual(bounds("-1000-00-00T00:00:00Z", 8), (_jdn(-1008, 1, 1), _jdn(-999, 12, 31)))
+        self.assertEqual(bounds("-0500-00-00T00:00:00Z", 8), (_jdn(-508, 1, 1), _jdn(-499, 12, 31)))
+        self.assertEqual(bounds("-0005-00-00T00:00:00Z", 8), (_jdn(-8, 1, 1), _jdn(0, 12, 31)))      # 9-1 BCE
+        self.assertEqual(bounds("+0005-00-00T00:00:00Z", 8), (_jdn(1, 1, 1), _jdn(9, 12, 31)))       # 1-9 CE
         # text sorts BCE backwards; day numbers do not
         a, b = bounds("-0500-00-00T00:00:00Z", 9), bounds("-0100-00-00T00:00:00Z", 9)
         self.assertGreater(wd_time(time("-0500-00-00T00:00:00Z", 9)["value"])[0],
                            wd_time(time("-0100-00-00T00:00:00Z", 9)["value"])[0])
         self.assertLess(a[0], b[0])
+
+
+    def test_julian_values_are_bounded_in_their_own_calendar(self):
+        self.assertEqual(_jdn_julian(1582, 10, 5), _jdn(1582, 10, 15))           # the reform: the same day
+        # Julian 1500 runs from Gregorian 10 January 1500 to 9 January 1501
+        self.assertEqual(time_bounds(time("+1500-00-00T00:00:00Z", 9, JULIAN)["value"]), (2268933, 2269298))
+        self.assertEqual(time_bounds(time("+1500-00-00T00:00:00Z", 9)["value"]), (2268924, 2269288))
+        # a Julian month keeps its exact days although its text is cut to the year
+        self.assertEqual(time_bounds(time("+1500-03-00T00:00:00Z", 10, JULIAN)["value"]),
+                         (_jdn_julian(1500, 3, 1), _jdn_julian(1500, 3, 31)))
+        self.assertEqual(wd_time(time("+1500-03-00T00:00:00Z", 10, JULIAN)["value"]), ("1500", 9))
+        # a day stated in the Julian calendar: the same day number either way
+        v = time("+1917-10-25T00:00:00Z", 11, JULIAN)["value"]
+        self.assertEqual(time_bounds(v), day_bounds(wd_time_parts(v)))
 
 
 class ImportTests(unittest.TestCase):
@@ -182,7 +202,8 @@ class ImportTests(unittest.TestCase):
     def test_world_time(self):
         a, b = self.claim("Q1$AAA"), self.claim("Q1$BBB")
         self.assertEqual((a["valid_from"], a["valid_to"], a["time_precision"]), ("-0499", "1582-10-15", 9))
-        self.assertEqual((a["valid_from_day"], a["valid_to_day"]), (_jdn(-499, 1, 1), _jdn(1582, 10, 15)))
+        # 500 BCE stated in the Julian calendar starts on the Julian 1 January of that year
+        self.assertEqual((a["valid_from_day"], a["valid_to_day"]), (_jdn_julian(-499, 1, 1), _jdn(1582, 10, 15)))
         self.assertEqual((b["valid_from"], b["valid_to"], b["time_precision"]), ("1905-06", "1905-06", 10))
         self.assertEqual((b["valid_from_day"], b["valid_to_day"]), (_jdn(1905, 6, 1), _jdn(1905, 6, 30)))
 
@@ -225,6 +246,27 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(again["new"], 0)
         self.assertEqual(self.conn.execute("SELECT count(*) FROM claim_qualifier").fetchone()[0], 3)
         self.assertEqual(self.conn.execute("SELECT count(*) FROM claim_reference").fetchone()[0], 2)
+
+    def test_each_entity_is_superseded_as_of_the_batch_that_read_it(self):
+        """A summary recorded between two batches is superseded only by a batch read after it."""
+        tmp = Path(tempfile.mkdtemp())
+        conn = dbm.connect(tmp / "t.sqlite", create=True)
+        dbm.init_schema(conn)
+        summaries = summary_corpus(tmp, "wikidata-entities-20260115", [("Q1", "P279", "Q2"), ("Q3", "P279", "Q4")],
+                                   "2026-01-15T00:00:00Z")
+        c = CorpusFile(tmp / "wikidata-statements-20260201" / "corpus.sqlite", create=True,
+                       name="wikidata-statements-20260201", title="two batches")
+        c.add("entities/batch-001.json", json.dumps(ENTITIES).encode(), url="https://www.wikidata.org/w/api.php",
+              retrieved_at="2026-01-01T00:00:00Z")                       # Q1, read before the summary
+        q3 = {"entities": {"Q3": {"id": "Q3", "lastrevid": 5, "claims": {}}}}
+        c.add("entities/batch-002.json", json.dumps(q3).encode(), url="https://www.wikidata.org/w/api.php",
+              retrieved_at="2026-02-01T00:00:00Z")                       # Q3, read after it
+        c.seal()
+        wikidata.import_claims(conn, summaries)
+        wikidata.import_statements(conn, c)
+        rows = dict(conn.execute("SELECT subject, superseded_at FROM claim WHERE statement_id IS NULL"))
+        self.assertIsNone(rows["wd/Q1"], "Q1 was read before this summary was recorded")
+        self.assertEqual(rows["wd/Q3"], "2026-02-01T00:00:00Z")
 
     def test_a_later_summary_is_not_superseded_by_older_statements(self):
         later = summary_corpus(self.tmp, "wikidata-entities-20260301", [("Q1", "P361", "Q9")], "2026-03-01T00:00:00Z")

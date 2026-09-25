@@ -31,12 +31,12 @@ class DecisionTests(unittest.TestCase):
 
     def test_human_decisions_layer_on_proposals(self):
         review.append("Ada Reviewer", review.mapping_target("acat/a", "wd/Q1"), "approve", perspective="Istanbul",
-                      directory=self.dir)
+                      kind="human", directory=self.dir)
         review.append("Ada Reviewer", review.mapping_target("acat/b", "wd/Q2"), "revise", relation="closeMatch",
-                      rationale="Wikidata's item is broader in scope", directory=self.dir)
-        review.append("Ada Reviewer", review.mapping_target("acat/a", "wd/Q1"), "approve", directory=self.dir)
+                      rationale="Wikidata's item is broader in scope", kind="human", directory=self.dir)
+        review.append("Ada Reviewer", review.mapping_target("acat/a", "wd/Q1"), "approve", kind="human", directory=self.dir)
         review.append("Ada Reviewer", review.mapping_target("acat/c", "wd/Q3"), "object",
-                      rationale="a different sense of the word", directory=self.dir)
+                      rationale="a different sense of the word", kind="human", directory=self.dir)
         e = self.effective()
         self.assertEqual((e["acat/a"]["status"], e["acat/a"]["reviewer"]), ("accepted", "Ada Reviewer"))
         self.assertEqual(e["acat/b"]["relation"], "closeMatch")
@@ -53,25 +53,36 @@ class DecisionTests(unittest.TestCase):
     def test_latest_human_decision_wins(self):
         target = review.mapping_target("acat/a", "wd/Q1")
         with mock.patch("acatalogue.review.utcnow", return_value="2026-09-25T10:00:00Z"):
-            review.append("Ada", target, "object", rationale="first look", directory=self.dir)
+            review.append("Ada", target, "object", rationale="first look", kind="human", directory=self.dir)
         with mock.patch("acatalogue.review.utcnow", return_value="2026-09-26T10:00:00Z"):
-            review.append("Ada", target, "approve", directory=self.dir)
+            review.append("Ada", target, "approve", kind="human", directory=self.dir)
         self.assertEqual(self.effective()["acat/a"]["status"], "accepted")
 
     def test_invalid_rows_are_never_written(self):
         with self.assertRaises(SeedError):
-            review.append("Ada", review.mapping_target("acat/a", "wd/Q1"), "object", directory=self.dir)  # no why
+            review.append("Ada", review.mapping_target("acat/a", "wd/Q1"), "object", kind="human", directory=self.dir)  # no why
         with self.assertRaises(SeedError):
-            review.append("Ada", "acat/a", "approve", directory=self.dir)                    # not a target
+            review.append("Ada", "acat/a", "approve", kind="human", directory=self.dir)                    # not a target
         with self.assertRaises(SeedError):
             review.append("Ada", review.mapping_target("acat/a", "wd/Q1"), "approve", rationale="a\tb",
-                          directory=self.dir)
+                          kind="human", directory=self.dir)
+        self.assertEqual(list(self.dir.glob("*.tsv")), [])
+
+    def test_an_agent_cannot_be_recorded_as_a_person(self):
+        with self.assertRaises(SeedError):
+            review.append("claude (AI agent, session x)", review.mapping_target("acat/a", "wd/Q1"), "object",
+                          kind="human", rationale="looks wrong", directory=self.dir)
+        with self.assertRaises(TypeError):                                     # who decides is never assumed
+            review.append("Ada", review.mapping_target("acat/a", "wd/Q1"), "approve", directory=self.dir)
         self.assertEqual(list(self.dir.glob("*.tsv")), [])
 
     def test_reviewer_kind(self):
         self.assertEqual(review.reviewer_kind("claude (AI agent, session 2026-09-25)"), "AI agent")
         self.assertEqual(review.reviewer_kind("seed"), "seed file (no named reviewer)")
-        self.assertEqual(review.reviewer_kind("Ada Reviewer"), "human")
+        # a bare name is not taken for a person: people decide through seed/reviews/, which the method records
+        self.assertEqual(review.reviewer_kind("Ada Reviewer"), "unknown")
+        self.assertEqual(review.reviewer_kind("another model"), "unknown")
+        self.assertEqual(review.reviewer_kind("Ada Reviewer", "wikidata-sparql+human-approved"), "human")
 
 
 class BuildTests(unittest.TestCase):
@@ -83,11 +94,11 @@ class BuildTests(unittest.TestCase):
         cls.tmp = Path(tempfile.mkdtemp())
         reviews = cls.tmp / "reviews"
         review.append("Ada Reviewer", review.mapping_target("acat/abjads", "wd/Q185087"), "object",
-                      rationale="test objection", directory=reviews)
+                      kind="human", rationale="test objection", directory=reviews)
         review.append("Ada Reviewer", review.mapping_target("acat/abugidas", "wd/Q335806"), "revise",
-                      relation="closeMatch", rationale="test revision", directory=reviews)
+                      kind="human", relation="closeMatch", rationale="test revision", directory=reviews)
         review.append("Ada Reviewer", review.mapping_target("acat/acoustics", "wd/Q82811"), "approve",
-                      perspective="test", directory=reviews)
+                      kind="human", perspective="test", directory=reviews)
         with mock.patch.object(review, "REVIEW_DIR", reviews):
             cls.report = build(cls.tmp / "cat.sqlite", verbose=False)
         cls.conn = dbm.connect(cls.tmp / "cat.sqlite", readonly=True)

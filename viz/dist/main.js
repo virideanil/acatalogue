@@ -470,6 +470,7 @@ class App {
         this.neighbors = null;
         this.nodeAbort?.abort();
         this.ui.clearInspector();
+        this.ui.clearTreeSelection();
         this.kick();
     }
     /** Select an id if it is in the field; otherwise show its record (API) without a selection. */

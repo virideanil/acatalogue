@@ -396,10 +396,10 @@ export class Ui {
     narrow.addEventListener("change", () => this.setPanelOpen(!narrow.matches));
   }
 
-  /** WCAG 2.2.2: a visible, keyboard-reachable way to stop all motion. */
+  /** WCAG 2.2.2: a visible, keyboard-reachable way to stop all motion. A toggle button keeps its label
+   *  ("Pause motion") and says its state through aria-pressed, shown by the pressed style (ARIA APG). */
   setPaused(on: boolean): void {
     this.pauseButton.setAttribute("aria-pressed", String(on));
-    this.pauseButton.textContent = on ? "Resume motion" : "Pause motion";
   }
 
   // ------------------------------------------------------------ tree view (ARIA APG tree, lazy)
@@ -470,9 +470,15 @@ export class Ui {
     li.focus();
   }
 
-  private markSelected(li: HTMLLIElement): void {
+  private markSelected(li: HTMLLIElement | null): void {
     for (const x of this.tree.querySelectorAll('li[aria-selected="true"]')) x.setAttribute("aria-selected", "false");
-    li.setAttribute("aria-selected", "true");
+    li?.setAttribute("aria-selected", "true");
+  }
+
+  /** The field's selection was cleared: the tree selects nothing, now or when it is next opened. */
+  clearTreeSelection(): void {
+    this.pendingReveal = -1;
+    this.markSelected(null);
   }
 
   private onTreeKey(e: KeyboardEvent, cb: UiCallbacks): void {
@@ -747,6 +753,7 @@ export class Ui {
           li.append(h("span", "meta", ` ${m.id} · ${[m.relation, m.status].filter(Boolean).join(" · ")}`));
           if (m.decided_by === "AI agent") li.append(h("p", "badge agent", "Proposed by an AI agent; no person has reviewed it yet."));
           else if (m.decided_by === "human") li.append(h("p", "badge human", `Decided by ${m.reviewer}.`));
+          else if (m.decided_by === "unknown") li.append(h("p", "badge", `Decided by ${m.reviewer}; the data does not say whether a person or a machine.`));
           else if (m.decided_by) li.append(h("p", "badge", "Authored in the seed files."));
           if (m.method) li.append(h("p", "meta", `method: ${m.method}${m.note ? ` · ${m.note}` : ""}`));
           ul.append(li);
