@@ -17,9 +17,13 @@ def _mb(n) -> str:
     return f"{n / 1e9:,.1f} GB" if n >= 1e9 else f"{n / 1e6:,.1f} MB" if n >= 1e5 else f"{n / 1e3:,.0f} kB"
 
 
-def _size(reg, sid: str):
-    known = [int(f["bytes"]) for f in reg.files.get(sid, []) if (f.get("bytes") or "").isdigit()]
-    return sum(known) if known and len(known) == len(reg.files.get(sid, [])) else (reg.sources[sid].get("size") or None)
+def _size(reg, sid: str) -> int | None:
+    """Download size: the files' sizes when all are known, else the registry's estimate."""
+    known = [int(f["bytes"]) for f in reg.files.get(sid, []) if str(f.get("bytes") or "").isdigit()]
+    if known and len(known) == len(reg.files.get(sid, [])):
+        return sum(known)
+    est = str(reg.sources[sid].get("size") or "")
+    return int(est) if est.isdigit() else None
 
 
 def cmd_sources(args) -> int:
@@ -40,7 +44,8 @@ def _list(args, store, reg) -> int:
     print(f"{'':2}{'id':28s} {'size':>9s}  {'licence':22s} {'langs':>5s}  {'mode':6s} perspective")
     for s in sorted(rows, key=lambda s: (s.get("recommend") != "starter", s["id"])):
         mark = "* " if s["id"] in sel else "  "
-        langs = str(len((s.get("languages") or "").split())) if s.get("languages") else "?"
+        lg = (s.get("languages") or "").strip()
+        langs = lg if lg.isdigit() else (str(len(lg.split())) if lg else "?")
         print(f"{mark}{s['id']:28s} {_mb(_size(reg, s['id'])):>9s}  {(s.get('license') or '')[:22]:22s} {langs:>5s}  "
               f"{reg.mode(s['id'], sel[s['id']]['mode'] if s['id'] in sel else None):6s} "
               f"{(s.get('perspective') or '')[:70]}")
@@ -93,6 +98,12 @@ def _select(args, store, reg) -> int:
         print("acat sources: " + "; ".join(problems) + " (deselect the other one first)", file=sys.stderr)
         return 2
     via = next((n for n in args.ids if n.startswith("preset:")), "user")
+    closed = [i for i in ids if not reg.files.get(i)]
+    for i in closed:
+        s = reg.sources[i]
+        print(f"  {i}: not selected: no public file ({s.get('access') or 'none'}; {s.get('license') or 'licence unknown'})."
+              f" See {s.get('homepage') or 'its homepage'}", file=sys.stderr)
+    ids = [i for i in ids if i not in closed]
     for i in ids:
         store.select(i, via=via, mode=args.mode)
     total = sum(_size(reg, i) or 0 for i in ids)
@@ -122,7 +133,7 @@ def _add(args, store, reg) -> int:
         json.loads(args.options)
     row = {"id": sid, "title": args.title or sid, "publisher": args.publisher or "", "perspective": args.perspective or "",
            "domains": args.domains or "", "kind": "", "languages": args.languages or "", "license": args.license or "unknown",
-           "license_url": "", "homepage": args.homepage or "", "update": "", "access": "local" if args.path else "download",
+           "license_url": "", "homepage": args.homepage or "", "update": "", "access": "local" if args.path else "open",
            "converter": args.converter, "options": args.options or "{}", "scheme": args.scheme or sid,
            "integrate": args.mode or "full", "iri_prefixes": args.iri_prefixes or "", "curie_prefixes": "",
            "wikidata_property": "", "notes": args.notes or "", "added_at": utcnow()}

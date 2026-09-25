@@ -54,8 +54,9 @@ class Resolver:
             for item in (e.get("curie_prefixes") or "").split():
                 prefix, _, tpl = item.partition("|")
                 curie[prefix.lower()] = (scheme, tpl or "{rest}")
-            if e.get("wikidata_property"):
-                wdp[e["wikidata_property"]] = scheme
+            for item in (e.get("wikidata_property") or "").split():
+                prop, _, rest = item.partition("|")
+                wdp[prop] = (scheme, rest.partition("|")[0] or "{rest}")
         self.iri = sorted(iri, key=lambda x: -len(x[0]))
         self.curie = curie
         self.wdp = wdp
@@ -68,14 +69,24 @@ class Resolver:
                 return f"{scheme}/{code}" if _CODE.fullmatch(code) else None
         m = re.fullmatch(r"(P\d+):(.+)", t)
         if m and m.group(1) in self.wdp:
-            code = m.group(2).strip()
-            return f"{self.wdp[m.group(1)]}/{code}" if _CODE.fullmatch(code) else None
+            scheme, tpl = self.wdp[m.group(1)]
+            code = wd_code(m.group(2), tpl)
+            return f"{scheme}/{code}" if code else None
         m = re.fullmatch(r"([A-Za-z][A-Za-z0-9_.\-]*):(\S+)", t)
         if m and not t.lower().startswith(("http:", "https:", "urn:")) and m.group(1).lower() in self.curie:
             scheme, tpl = self.curie[m.group(1).lower()]
             code = tpl.format(rest=m.group(2))
             return f"{scheme}/{code}" if _CODE.fullmatch(code) else None
         return None
+
+
+def wd_code(value: str, tpl: str = "{rest}") -> str | None:
+    """A Wikidata identifier value as the source's code: 'GO:0007568' with 'GO_{rest}' is GO_0007568,
+    '10238' with 'p{rest}' is p10238. A CURIE's prefix is dropped before the template applies."""
+    v = value.strip()
+    rest = v.split(":", 1)[1] if re.fullmatch(r"[A-Za-z][A-Za-z0-9_.\-]*:\S+", v) else v
+    code = tpl.format(rest=rest)
+    return code if _CODE.fullmatch(code) else None
 
 
 def _register(conn, sha: str, size: int, kind: str, name: str, corpus: str | None, uri: str | None,
@@ -149,7 +160,8 @@ def _integrate(conn, r: LeanReader, entry, scheme, lean_sha, size, snapshot, man
     else:                                       # attach: the lean file holds it; the catalogue carries none of it
         stats["deprecated"] = _deprecate_all(conn, scheme)
         stats["superseded_claims"] = _supersede(conn, previous + [lean_sha], now)
-    stats["hub_mappings"] = _hub(conn, scheme, entry.get("wikidata_property"))
+    codes = {c for (c,) in r.conn.execute("SELECT code FROM term")}
+    stats["hub_mappings"] = _hub(conn, scheme, entry.get("wikidata_property"), codes.__contains__)
     counts = r.counts()
     conn.execute("INSERT INTO lean_integration(scheme, source, snapshot, manifest_sha512, lean_sha512, lean_path,"
                  " mode, counts, at) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -201,7 +213,8 @@ def _full(conn, r: LeanReader, scheme: str, lean_sha: str, recorded: str, resolv
     for t, p, lg, value in rc.execute("SELECT term, p, lang, value FROM attr ORDER BY term, p, lang, value"):
         pr, tag = preds[p], lang[lg]
         role, iri = pr["role"], pr["iri"] or ""
-        if role == "note" and (iri in DEFINITIONS or pr["name"] in ("definition", "skos:definition")):
+        if role == "note" and (iri in DEFINITIONS or iri.endswith(("#definition", "/definition"))
+                               or pr["name"] in ("definition", "skos:definition")):
             label_rows.append((cid[t], tag, "desc", nfc(str(value)), lean_sha))
             rank = 0 if tag == "en" else 2
             if t not in scope or rank < scope[t][0]:
@@ -321,22 +334,30 @@ def _deprecate_all(conn, scheme: str) -> int:
                         (scheme,)).rowcount
 
 
-def _hub(conn, scheme: str, prop: str | None) -> int:
-    """Mappings from Wikidata items to this scheme's concepts, read from Wikidata's own statements."""
-    if not prop:
-        return 0
-    method = f"declared:wikidata ({prop})"
-    conn.execute("DELETE FROM mapping WHERE method = ? AND to_id LIKE ?", (method, f"{scheme}/%"))
-    rows = [(s, f"{scheme}/{v.strip()}", "exactMatch", method, "proposed", None, None, sha)
-            for s, v, sha in conn.execute("SELECT subject, value, source_sha512 FROM claim WHERE predicate = ?"
-                                          " AND superseded_at IS NULL AND value IS NOT NULL AND snak_type = 'value'",
-                                          (f"wd/{prop}",))
-            if _CODE.fullmatch(v.strip())]
-    conn.executemany("INSERT OR IGNORE INTO mapping(from_id, to_id, relation, method, status, reviewer, note,"
-                     " source_sha512) VALUES (?,?,?,?,?,?,?,?)", [r for r in rows
-                                                                    if conn.execute("SELECT 1 FROM concept WHERE id = ?", (r[0],)).fetchone()])
-    return conn.execute("SELECT count(*) FROM mapping WHERE method = ? AND to_id LIKE ?",
-                        (method, f"{scheme}/%")).fetchone()[0]
+def _hub(conn, scheme: str, spec: str | None, known=lambda code: True) -> int:
+    """Mappings from Wikidata items to this scheme's concepts, read from Wikidata's own statements
+    (spec: 'P686|GO_{rest}' or 'P244|{rest}|^sh' — the property, how its values become this scheme's
+    codes, and which values belong to this scheme). Only codes the source has become mappings."""
+    total = 0
+    for item in (spec or "").split():
+        prop, _, rest = item.partition("|")
+        tpl, _, pattern = rest.partition("|")
+        method = f"declared:wikidata ({prop})"
+        conn.execute("DELETE FROM mapping WHERE method = ? AND to_id LIKE ?", (method, f"{scheme}/%"))
+        rows = []
+        for s, v, sha in conn.execute("SELECT subject, value, source_sha512 FROM claim WHERE predicate = ?"
+                                      " AND superseded_at IS NULL AND value IS NOT NULL AND snak_type = 'value'",
+                                      (f"wd/{prop}",)):
+            if pattern and not re.search(pattern, v):
+                continue
+            code = wd_code(v, tpl or "{rest}")
+            if code and known(code) and conn.execute("SELECT 1 FROM concept WHERE id = ?", (s,)).fetchone():
+                rows.append((s, f"{scheme}/{code}", "exactMatch", method, "proposed", None, None, sha))
+        conn.executemany("INSERT OR IGNORE INTO mapping(from_id, to_id, relation, method, status, reviewer, note,"
+                         " source_sha512) VALUES (?,?,?,?,?,?,?,?)", rows)
+        total += conn.execute("SELECT count(*) FROM mapping WHERE method = ? AND to_id LIKE ?",
+                              (method, f"{scheme}/%")).fetchone()[0]
+    return total
 
 
 def retire(conn: sqlite3.Connection, scheme: str, source: str, actor: str = "acat sources") -> dict:

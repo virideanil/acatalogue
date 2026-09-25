@@ -1,4 +1,4 @@
-"""SKOS, SKOS-XL and OWL vocabularies published as RDF: N-Triples, N-Quads or RDF/XML (plain or
+"""SKOS, SKOS-XL and OWL vocabularies published as RDF: N-Triples, N-Quads, RDF/XML or Turtle (plain or
 compressed, alone or in archives) -> lean.
 
 Two passes. The triples stream into a staging database (IRIs interned as integers); then the things
@@ -11,7 +11,10 @@ the converter does not know is kept, as an attribute (literal) or a relation or 
 its own name: nothing a vocabulary states is dropped for being unfamiliar.
 
 Options (registry, JSON): term_types (extra type IRIs), iri_prefix (the vocabulary's namespace, when
-the most common one is not it), members ('*.nt' …, which archive members to read), base (for RDF/XML).
+the most common one is not it), members ('*.nt' …, which archive members to read), base (for RDF/XML
+and Turtle), and for vocabularies that are not SKOS: label_predicates ({IRI: pref|alt|hidden}),
+broader_predicates, related_predicates, note_predicates (IRIs), default_lang (for untagged names and
+notes, e.g. GND's German), lang_aliases ({'sme': 'se'}), keep_prefix (only terms whose IRI starts so).
 """
 from __future__ import annotations
 
@@ -232,8 +235,11 @@ def triples(inp: Input, doc: int, options: dict):
             yield from ntriples(stream, doc)
         elif low.endswith((".rdf", ".xml", ".owl", ".skos")):
             yield from rdfxml(stream, doc, options.get("base") or inp.url or "")
+        elif low.endswith((".ttl", ".turtle")):
+            from .turtle import parse
+            yield from parse(stream, doc, options.get("base") or "")
         else:
-            raise ValueError(f"{name}: not a format this converter reads (N-Triples, N-Quads, RDF/XML)")
+            raise ValueError(f"{name}: not a format this converter reads (N-Triples, N-Quads, RDF/XML, Turtle)")
         doc += 1
 
 
@@ -296,16 +302,31 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
     name_of = {i: v for v, i in nodes.items()}
     I = nodes.get
     types = [I(t) for t in TERM_TYPES + list(options.get("term_types", [])) if I(t)]
-    if not types:
+    if not types and not options.get("term_if_predicate"):
         raise ValueError("no skos:Concept, owl:Class or other term type in these files; "
                          "name the vocabulary's types in the registry options (term_types)")
-    rdf_type = I(RDF + "type")
+    rdf_type = I(RDF + "type") or nodes.setdefault(RDF + "type", len(nodes) + 1)
     marks = ",".join(map(str, types))
     type_rank = {t: k for k, t in enumerate(types)}
     first_type: dict[int, int] = {}
+    keep = options.get("keep_prefix")
     for s, o in st.execute(f"SELECT s, o FROM t WHERE p = ? AND o IN ({marks}) ORDER BY s", (rdf_type,)):
-        if not name_of[s].startswith("_:") and (s not in first_type or type_rank[o] < type_rank[first_type[s]]):
+        if name_of[s].startswith("_:") or (keep and not name_of[s].startswith(keep)):
+            continue
+        if s not in first_type or type_rank[o] < type_rank[first_type[s]]:
             first_type[s] = o
+    # vocabularies with many types of their own (GND): a thing is a term when it has this predicate
+    for pred_iri in options.get("term_if_predicate", []):
+        pi = I(pred_iri)
+        if pi is None:
+            continue
+        fallback = nodes.setdefault(pred_iri + "#subject", len(nodes) + 1)
+        name_of[fallback] = pred_iri + "#subject"
+        type_rank.setdefault(fallback, len(type_rank))
+        types.append(fallback)
+        for (s,) in st.execute("SELECT DISTINCT s FROM t WHERE p = ?", (pi,)):
+            if not name_of[s].startswith("_:") and (not keep or name_of[s].startswith(keep)) and s not in first_type:
+                first_type[s] = fallback
     terms = sorted(first_type)                       # the vocabulary's order of first mention
     # codes: the local part of each IRI; the most common namespace (or iri_prefix) makes the template
     spaces = Counter(_split(name_of[t])[0] for t in terms)
@@ -320,7 +341,7 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
             local = "x" + hashlib.sha256(iri.encode()).hexdigest()[:20]
         taken.add(local)
         code_of[t] = local
-    kinds = {t: w.kind(_split(name_of[t])[1] or name_of[t], name_of[t]) for t in types}
+    kinds = {t: w.kind(_split(name_of[t])[1] or name_of[t], name_of[t]) for t in set(first_type.values())}
     for t in terms:
         iri = name_of[t]
         w.term(code_of[t], kind=kinds[first_type[t]], iri=None if ns and iri == ns + code_of[t] else iri)
@@ -371,6 +392,16 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
 
     deprecated_iris = {OWL + "deprecated"}
     termset = set(terms)
+    labels_extra = dict(options.get("label_predicates", {}))
+    broader_extra = set(options.get("broader_predicates", []))
+    related_extra = set(options.get("related_predicates", []))
+    notes_extra = set(options.get("note_predicates", []))
+    default_lang = options.get("default_lang")
+    aliases = options.get("lang_aliases", {})
+
+    def lang_of(lang):
+        lang = lang or default_lang or ""
+        return aliases.get(lang, lang)
     for k, t in enumerate(terms, 1):
         code = code_of[t]
         rows = props(t)
@@ -384,11 +415,13 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
                 continue
             if lit is not None:
                 if pi in LABELS:
-                    w.label(code, lit, lang, LABELS[pi])
+                    w.label(code, lit, lang_of(lang), LABELS[pi])
+                elif pi in labels_extra:
+                    w.label(code, lit, lang_of(lang), labels_extra[pi])
                 elif pi in SECOND_NAMES:
-                    w.label(code, lit, lang, "alt" if (lang or "") in have_pref else "pref")
-                elif pi in NOTES:
-                    w.attr(code, pred(p, "note"), lit, lang)
+                    w.label(code, lit, lang_of(lang), "alt" if (lang or "") in have_pref else "pref")
+                elif pi in NOTES or pi in notes_extra:
+                    w.attr(code, pred(p, "note"), lit, lang_of(lang))
                 elif pi == NOTATION:
                     w.attr(code, pred(p, "notation"), typed(lit, dt))
                 elif pi in deprecated_iris:
@@ -401,13 +434,13 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
             target = name_of[o]
             if pi in XL_LABELS:                                    # SKOS-XL: the label is a resource
                 for text, lang in literals_of(o, SKOSXL + "literalForm"):
-                    w.label(code, text, lang, XL_LABELS[pi])
-            elif pi in NOTES:                                      # a note published as a resource
+                    w.label(code, text, lang_of(lang), XL_LABELS[pi])
+            elif pi in NOTES or pi in notes_extra:                 # a note published as a resource
                 for text, lang in literals_of(o, RDF + "value"):
-                    w.attr(code, pred(p, "note"), text, lang)
+                    w.attr(code, pred(p, "note"), text, lang_of(lang))
             elif pi in DERIVED:
                 continue
-            elif pi in BROADER_UP or pi in UNDER_O:
+            elif pi in BROADER_UP or pi in UNDER_O or pi in broader_extra:
                 if pi == RDFS + "subClassOf" and target.startswith("_:"):
                     _restriction(st, o, code, code_of, name_of, w, pred, I)
                 elif o in termset:
@@ -417,7 +450,7 @@ def _extract(st: sqlite3.Connection, nodes: dict[str, int], w, options: dict, pr
             elif pi in BROADER_DOWN or pi in UNDER_S:
                 if o in termset:
                     w.rel(code_of[o], up(p), code)
-            elif pi in RELATED:
+            elif pi in RELATED or pi in related_extra:
                 if o in termset:
                     w.rel(code, pred(p, "related"), code_of[o])
                 else:

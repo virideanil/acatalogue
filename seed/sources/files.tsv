@@ -1,0 +1,136 @@
+source	name	url	format	bytes	checksum	role	verified
+wikidata-json-all	latest-all.json.bz2	https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.bz2		103222517992			HEAD 200 2026-09-25
+wikidata-truthy-nt	latest-truthy.nt.bz2	https://dumps.wikimedia.org/wikidatawiki/entities/latest-truthy.nt.bz2		43458740693			HEAD 200 2026-09-25
+wikidata-lexemes	latest-lexemes.json.bz2	https://dumps.wikimedia.org/wikidatawiki/entities/latest-lexemes.json.bz2		475051424			HEAD 200 2026-09-25
+wikipedia-cirrus-en	enwiki_content-20260920-00000.json.bz2	https://dumps.wikimedia.org/other/cirrus_search_index/20260920/index_name=enwiki_content/enwiki_content-20260920-00000.json.bz2		41721421896			HEAD 200 2026-09-25
+wikipedia-cirrus-tr	trwiki_content-20260920-00000.json.bz2	https://dumps.wikimedia.org/other/cirrus_search_index/20260920/index_name=trwiki_content/trwiki_content-20260920-00000.json.bz2		2090624260			HEAD 200 2026-09-25
+wikipedia-cirrus-sw	swwiki_content-20260920-00000.json.bz2	https://dumps.wikimedia.org/other/cirrus_search_index/20260920/index_name=swwiki_content/swwiki_content-20260920-00000.json.bz2		104372586			HEAD 200 2026-09-25
+wikipedia-xml-en	enwiki-latest-pages-articles.xml.bz2	https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2		25680955982			HEAD 200 2026-09-25
+wikipedia-xml-tr	trwiki-2026-09-01-p6p4740808.xml.bz2	https://dumps.wikimedia.org/other/mediawiki_content_current/trwiki/2026-09-01/xml/bzip2/trwiki-2026-09-01-p6p4740808.xml.bz2		1368347402	url:https://dumps.wikimedia.org/other/mediawiki_content_current/trwiki/2026-09-01/xml/bzip2/SHA256SUMS		HEAD 200 2026-09-25
+wikipedia-categories-en	enwiki-20260919-categories.ttl.gz	https://dumps.wikimedia.org/other/categoriesrdf/20260919/enwiki-20260919-categories.ttl.gz		103476969			HEAD 200 2026-09-25
+abstract-wikipedia	abstractwiki-latest-pages-articles.xml.bz2	https://dumps.wikimedia.org/abstractwiki/latest/abstractwiki-latest-pages-articles.xml.bz2		824326			HEAD 200 2026-09-25
+wikifunctions	wikifunctionswiki-latest-pages-articles.xml.bz2	https://dumps.wikimedia.org/wikifunctionswiki/latest/wikifunctionswiki-latest-pages-articles.xml.bz2		16486599			HEAD 200 2026-09-25
+dbpedia-ontology	dbpedia-ontology.nt	https://databus.dbpedia.org/ontologies/dbpedia.org/ontology/2024.08.01-180007/ontology_type=parsed.nt		9858392	sha256:33408e32640911a0d32575054d1c8d02a6d7725878f56b73758674d3af9e1d05		HEAD 200 2026-09-25
+dbpedia-kg-instance-types-en	instance-types_graph=dbpedia-org_partition=rdf-type.ttl.gz	https://databus.dbpedia.org/dbpedia/dbpedia-wikipedia-kg-dump/instance-types/2025-12-01/instance-types_graph=dbpedia-org_partition=rdf-type.ttl.gz		752403116			HEAD 200 2026-09-25
+yago-4.6-taxonomy	yago-4.6-schema.zip	https://yago-knowledge.org/data/yago4.6/yago-4.6-schema.zip		19471			HEAD 200 2026-09-25
+yago-4.6-taxonomy	yago-4.6-taxonomy.zip	https://yago-knowledge.org/data/yago4.6/yago-4.6-taxonomy.zip		41519942			HEAD 200 2026-09-25
+yago-4.6-facts	yago-4.6-facts.zip	https://yago-knowledge.org/data/yago4.6/yago-4.6-facts.zip		829349027			HEAD 200 2026-09-25
+kbpedia	kbpedia_reference_concepts.owl	https://kbpedia.org/kbpedia/v250/kbpedia_reference_concepts.owl		74820227			HEAD 200 2026-09-25
+conceptnet-5.7	conceptnet-assertions-5.7.0.csv.gz	https://s3.amazonaws.com/conceptnet/downloads/2019/edges/conceptnet-assertions-5.7.0.csv.gz		497963447			HEAD 200 2026-09-25
+oewn-2025-plus	english-wordnet-2025-plus.xml.gz	https://en-word.net/downloads/english-wordnet-2025-plus.xml.gz		12925887			HEAD 200 2026-09-25
+omw-2.0	english-wordnet-2025-plus.xml.gz	https://en-word.net/downloads/english-wordnet-2025-plus.xml.gz		12925887			HEAD 200 2026-09-25
+omw-2.0	omw-2.0.tar.xz	https://github.com/omwn/omw-data/releases/download/v2.0/omw-2.0.tar.xz		55846636			HEAD 200 2026-09-25
+kaikki-enwiktionary-all	raw-wiktextract-data.jsonl.gz	https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz		2900576073			HEAD 200 2026-09-25
+kaikki-en-turkish	kaikki.org-dictionary-Turkish.jsonl	https://kaikki.org/dictionary/Turkish/kaikki.org-dictionary-Turkish.jsonl		434802860			HEAD 200 2026-09-25
+kaikki-trwiktionary	tr-extract.jsonl.gz	https://kaikki.org/dictionary/downloads/tr/tr-extract.jsonl.gz		43470842			HEAD 200 2026-09-25
+dbnary-en	en_dbnary_ontolex.ttl.bz2	http://kaiko.getalp.org/static/ontolex/latest/en_dbnary_ontolex.ttl.bz2		217718216			HEAD 200 2026-09-25 (http only; https connection reset)
+openalex-topics	domains-manifest.json	https://openalex.s3.amazonaws.com/data/jsonl/domains/manifest.json	manifest:openalex				HEAD 200 2026-09-25
+openalex-topics	fields-manifest.json	https://openalex.s3.amazonaws.com/data/jsonl/fields/manifest.json	manifest:openalex				HEAD 200 2026-09-25
+openalex-topics	subfields-manifest.json	https://openalex.s3.amazonaws.com/data/jsonl/subfields/manifest.json	manifest:openalex				HEAD 200 2026-09-25
+openalex-topics	topics-manifest.json	https://openalex.s3.amazonaws.com/data/jsonl/topics/manifest.json	manifest:openalex				HEAD 200 2026-09-25
+openalex-concepts	concepts-manifest.json	https://openalex.s3.amazonaws.com/legacy-data/concepts/manifest	manifest:openalex				HEAD 200 2026-09-25
+schema-org	schemaorg-current-https.nt	https://schema.org/version/latest/schemaorg-current-https.nt		2321702			HEAD 200 2026-09-25
+ror	ror-data.zip	https://zenodo.org/records/22902037/files/v2.13-2026-09-22-ror-data.zip?download=1		37540961	md5:a935217de21e7983b977f5419f1a6b20		HEAD 200 2026-09-25
+physh	physh.nt.gz	https://raw.githubusercontent.com/physh-org/PhySH/v2.8.0/physh.nt.gz		861142			HEAD 200 2026-09-25
+lcsh	subjects.skosrdf.nt.gz	https://id.loc.gov/download/authorities/subjects.skosrdf.nt.gz		100520866			HEAD 200 2026-09-25
+lcc-mdsconnect	Class.2016.part01.xml.gz	https://www.loc.gov/cds/downloads/MDSConnect/Class.2016.part01.xml.gz		32816878			HEAD 200 2026-09-25
+lcgft	genreForms.skosrdf.nt.gz	https://id.loc.gov/download/authorities/genreForms.skosrdf.nt.gz		762947			HEAD 200 2026-09-25
+lc-childrens-subjects	childrensSubjects.skosrdf.nt.gz	https://id.loc.gov/download/authorities/childrensSubjects.skosrdf.nt.gz		3970866			HEAD 200 2026-09-25
+gnd-subjects	authorities-gnd-sachbegriff_lds.ttl.gz	https://data.dnb.de/opendata/authorities-gnd-sachbegriff_lds.ttl.gz		24119388	url:https://data.dnb.de/opendata/001_Pruefsumme_Checksum.txt		HEAD 200 2026-09-25
+ndlsh	ndlsh-rdf.zip	https://id.ndl.go.jp/auth/data/download/ndlsh-rdf.zip		4213477			HEAD 200 2026-09-25
+ndc9-jla	ndc9.zip	https://www.jla.or.jp/wp/wp-content/uploads/2025/06/ndc9.zip		1082504			HEAD 200 2026-09-25
+yso	yso-skos.rdf	https://api.finto.fi/download/yso/yso-skos.rdf		58531320			HEAD 200 2026-09-25
+koko	koko-skos.rdf	https://api.finto.fi/download/koko/koko-skos.rdf		75047066			HEAD 200 2026-09-25
+iconclass	content	https://zenodo.org/api/records/7074601/files/iconclass/data-2022-09-13-1.zip/content		17547448			HEAD 200 2026-09-25
+getty-aat-explicit	explicit.zip	http://aatdownloads.getty.edu/VocabData/explicit.zip		140707071			HEAD 200 2026-09-25 (http only; https on *downloads.getty.edu resets the connection)
+getty-tgn-explicit	explicit.zip	http://tgndownloads.getty.edu/VocabData/explicit.zip		1154597178			HEAD 200 2026-09-25 (http only; https resets)
+getty-ulan-explicit	explicit.zip	http://ulandownloads.getty.edu/VocabData/explicit.zip		395098466			HEAD 200 2026-09-25 (http only; https resets)
+unesco-thesaurus	unesco-thesaurus.rdf	https://vocabularies.unesco.org/exports/thesaurus/latest/unesco-thesaurus.rdf		8850742			GET-range 206 2026-09-25 (HEAD 200 without Content-Length; size from Content-Range)
+un-thesaurus	unbist-20231117.rdf	https://unbis-thesaurus.s3.amazonaws.com/unbist-20231117.rdf		20778677			HEAD 200 2026-09-25
+eurovoc	eurovoc_in_skos_core_concepts.zip	https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Fcellar%2F9f2bd600-ae7b-11e7-837e-01aa75ed71a1.0001.09%2FDOC_1&fileName=eurovoc_in_skos_core_concepts.zip		8769552			HEAD 200 2026-09-25 (no Content-Length; Range ignored, full GET 8769552 bytes)
+agrovoc	agrovoc_core.nt.zip	https://agrovoc.fao.org/latestAgrovoc/agrovoc_core.nt.zip		73760195			HEAD 200 2026-09-25
+gemet	gemet.rdf.gz	https://www.eionet.europa.eu/gemet/latest/gemet.rdf.gz		7423725			HEAD 200 2026-09-25
+stw	stw.nt.zip	https://zbw.eu/stw/version/latest/download/stw.nt.zip		1344583			HEAD 200 2026-09-25
+thesoz	thesoz.ttl	https://zenodo.org/api/records/18773539/files/thesoz.ttl/content		19333985			HEAD 200 2026-09-25
+mesh-xml	desc2026.xml.gz	https://nlmpubs.nlm.nih.gov/projects/mesh/MESH_FILES/xmlmesh/desc2026.gz		16812612			HEAD 200 2026-09-25
+mesh-rdf	mesh2026.nt.gz	https://nlmpubs.nlm.nih.gov/projects/mesh/rdf/2026/mesh2026.nt.gz		120696702	url:https://nlmpubs.nlm.nih.gov/projects/mesh/rdf/2026/mesh2026.nt.gz.sha1		HEAD 200 2026-09-25
+nalt	nalt-full_dwn.rdf.zip	https://lod.nal.usda.gov/downloads/nalt-full_dwn.rdf.zip		8515264			HEAD 200 2026-09-25
+eric-thesaurus	ERICThesaurus2025.zip	https://eric.ed.gov/ERICThesaurus2025.zip		1000436			HEAD 200 2026-09-25 (one earlier HEAD got an empty reply; GET-range 206)
+msc2020	MSC_2020.csv	https://msc2020.org/MSC_2020.csv		797211			HEAD 200 2026-09-25
+jel	classificationTree.xml	https://www.aeaweb.org/econlit/classificationTree.xml		182097			HEAD 200 2026-09-25
+arxiv-taxonomy	category_taxonomy	https://arxiv.org/category_taxonomy		83909			HEAD 200 2026-09-25
+homosaurus	v5.nt	https://homosaurus.org/v5.nt		14501548			HEAD 200 2026-09-25 (no Content-Length; full GET 14501548 bytes)
+austlang	austlang_dataset.csv	https://api.aiatsis.gov.au/files/public/austlang/austlang_dataset.csv		301501			502 2026-09-25 (the egress proxy rejected CONNECT to api.aiatsis.gov.au; the data.gov.au listing was read)
+geonames-cities15000	countryInfo.txt	https://download.geonames.org/export/dump/countryInfo.txt		31678			HEAD 200 2026-09-25
+geonames-cities15000	admin1CodesASCII.txt	https://download.geonames.org/export/dump/admin1CodesASCII.txt		151583			HEAD 200 2026-09-25
+geonames-cities15000	cities15000.zip	https://download.geonames.org/export/dump/cities15000.zip		3359528			HEAD 200 2026-09-25
+geonames-cities15000	hierarchy.zip	https://download.geonames.org/export/dump/hierarchy.zip		2132453			HEAD 200 2026-09-25
+geonames-cities15000	alternateNamesV2.zip	https://download.geonames.org/export/dump/alternateNamesV2.zip		204799163			HEAD 200 2026-09-25
+geonames-cities5000	countryInfo.txt	https://download.geonames.org/export/dump/countryInfo.txt		31678			HEAD 200 2026-09-25
+geonames-cities5000	admin1CodesASCII.txt	https://download.geonames.org/export/dump/admin1CodesASCII.txt		151583			HEAD 200 2026-09-25
+geonames-cities5000	cities5000.zip	https://download.geonames.org/export/dump/cities5000.zip		5707443			HEAD 200 2026-09-25
+geonames-cities5000	hierarchy.zip	https://download.geonames.org/export/dump/hierarchy.zip		2132453			HEAD 200 2026-09-25
+geonames-cities5000	alternateNamesV2.zip	https://download.geonames.org/export/dump/alternateNamesV2.zip		204799163			HEAD 200 2026-09-25
+geonames-cities1000	countryInfo.txt	https://download.geonames.org/export/dump/countryInfo.txt		31678			HEAD 200 2026-09-25
+geonames-cities1000	admin1CodesASCII.txt	https://download.geonames.org/export/dump/admin1CodesASCII.txt		151583			HEAD 200 2026-09-25
+geonames-cities1000	cities1000.zip	https://download.geonames.org/export/dump/cities1000.zip		11051618			HEAD 200 2026-09-25
+geonames-cities1000	hierarchy.zip	https://download.geonames.org/export/dump/hierarchy.zip		2132453			HEAD 200 2026-09-25
+geonames-cities1000	alternateNamesV2.zip	https://download.geonames.org/export/dump/alternateNamesV2.zip		204799163			HEAD 200 2026-09-25
+geonames-allcountries	countryInfo.txt	https://download.geonames.org/export/dump/countryInfo.txt		31678			HEAD 200 2026-09-25
+geonames-allcountries	admin1CodesASCII.txt	https://download.geonames.org/export/dump/admin1CodesASCII.txt		151583			HEAD 200 2026-09-25
+geonames-allcountries	allCountries.zip	https://download.geonames.org/export/dump/allCountries.zip		421992046			HEAD 200 2026-09-25
+geonames-allcountries	hierarchy.zip	https://download.geonames.org/export/dump/hierarchy.zip		2132453			HEAD 200 2026-09-25
+geonames-allcountries	alternateNamesV2.zip	https://download.geonames.org/export/dump/alternateNamesV2.zip		204799163			HEAD 200 2026-09-25
+wof-admin-sqlite	whosonfirst-data-admin-latest.db.bz2	https://data.geocode.earth/wof/dist/sqlite/whosonfirst-data-admin-latest.db.bz2		8596204210			HEAD 200 2026-09-25
+naturalearth-admin0-countries	ne_10m_admin_0_countries.zip	https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_countries.zip		4930492			HEAD 200 2026-09-25 (the naturalearthdata.com /http//.../download/ link answered 500 today; naciscdn.org is the CDN the publisher's downloads page links to)
+naturalearth-admin1-states-provinces	ne_10m_admin_1_states_provinces.zip	https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_1_states_provinces.zip		14909524			HEAD 200 2026-09-25 (the naturalearthdata.com /http//.../download/ link answered 500 today; naciscdn.org is the CDN the publisher's downloads page links to)
+naturalearth-populated-places	ne_10m_populated_places.zip	https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places.zip		2811199			HEAD 200 2026-09-25 (the naturalearthdata.com /http//.../download/ link answered 500 today; naciscdn.org is the CDN the publisher's downloads page links to)
+pleiades-gis-csv	pleiades_gis_data.zip	https://atlantides.org/downloads/pleiades/gis/pleiades_gis_data.zip		35586356			HEAD 200 2026-09-25
+pleiades-places-json	pleiades-places-latest.json.gz	https://atlantides.org/downloads/pleiades/json/pleiades-places-latest.json.gz		135954522			HEAD 200 2026-09-25
+osmnames-planet	planet-latest_geonames.tsv.gz	https://github.com/OSMNames/OSMNames/releases/download/v2.0.4/planet-latest_geonames.tsv.gz		1437702497			HEAD 200 2026-09-25
+sil-iso639-3-code-tables	iso-639-3_Code_Tables_20260715.zip	https://iso639-3.sil.org/sites/iso639-3/files/downloads/iso-639-3_Code_Tables_20260715.zip		154025			HEAD 200 2026-09-25
+glottolog-cldf	glottolog-cldf-v5.3.zip	https://zenodo.org/records/18840967/files/glottolog/glottolog-cldf-v5.3.zip?download=1		49646070			HEAD 200 2026-09-25
+glottolog-languoid-csv	glottolog_languoid.csv.zip	https://cdstar.eva.mpg.de//bitstreams/EAEA0-608B-9919-A962-0/glottolog_languoid.csv.zip		589571			HEAD 200 2026-09-25
+wals-cldf	content	https://zenodo.org/api/records/21389919/files/cldf-datasets/wals-v2020.5.zip/content		12623747			HEAD 200 2026-09-25
+iana-language-subtag-registry	language-subtag-registry	https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry		731819			HEAD 200 2026-09-25 (no Content-Length sent and Range ignored; 731,819 bytes by full GET)
+cldr-localenames-full	cldr-localenames-full-48.2.0.tgz	https://registry.npmjs.org/cldr-localenames-full/-/cldr-localenames-full-48.2.0.tgz		1958951	sha1:b4a4e9c43346713306be1f543ef4d6f7217a88ae		HEAD 200 2026-09-25 (no Content-Length); GET-range 206 total 1,958,951
+cldr-localenames-full	cldr-core-48.2.0.tgz	https://registry.npmjs.org/cldr-core/-/cldr-core-48.2.0.tgz		205098			HEAD 200 2026-09-25 (no Content-Length); GET-range 206 total 1,958,951
+iso15924-codes	iso15924.txt	https://www.unicode.org/iso15924/iso15924.txt		14444			HEAD 200 2026-09-25 (no Content-Length; 14,444 bytes by GET; Range answers describe a gzip-encoded 6,058-byte representation)
+debian-iso-codes	iso-codes_4.20.1.orig.tar.xz	https://deb.debian.org/debian/pool/main/i/iso-codes/iso-codes_4.20.1.orig.tar.xz		4702640			HEAD 200 2026-09-25
+periodo-dataset	p0dataset.json	https://n2t.net/ark:/99152/p0dataset.json		7806288			HEAD 200 2026-09-25 (ARK redirects via arks.org/ezid to https://data.perio.do/dataset.json)
+cliopatria-polities	content	https://zenodo.org/api/records/20274630/files/Seshat-Global-History-Databank/cliopatria-v0.2.0.zip/content		297058350			HEAD 200 2026-09-25
+dila-time-authority	authority_time.2012-02.zip	https://authority.dila.edu.tw/downloads/authority_time.2012-02.zip		1339960			HEAD 200 2026-09-25
+un-wpp2024-total-population	WPP2024_TotalPopulationBySex.csv.gz	https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_TotalPopulationBySex.csv.gz		16980593			HEAD 200 2026-09-25
+un-wpp2024-demographic-indicators	WPP2024_Demographic_Indicators_Medium.csv.gz	https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_Demographic_Indicators_Medium.csv.gz		16557272			HEAD 200 2026-09-25
+owid-population-longrun	population.csv	https://ourworldindata.org/grapher/population.csv?v=1&csvType=full&useColumnShortNames=false		1594182			HEAD 200 2026-09-25
+dplace-societies	content	https://zenodo.org/api/records/18229037/files/D-PLACE/dplace-cldf-v3.3.0.zip/content		11838759			HEAD 200 2026-09-25
+epr-core-2021	EPR-2021.csv	https://icr.ethz.ch/data/epr/core/EPR-2021.csv		331121			HEAD 200 2026-09-25
+gene-ontology-basic	go-basic.obo	http://purl.obolibrary.org/obo/go/go-basic.obo		32227785			HEAD 200 2026-09-25
+chebi-full	chebi.obo.gz	https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo.gz		47162742			HEAD 200 2026-09-25
+chebi-lite	chebi_lite.obo.gz	https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi_lite.obo.gz		7852321			HEAD 200 2026-09-25
+uberon-basic	uberon-basic.obo	http://purl.obolibrary.org/obo/uberon/uberon-basic.obo		12078648			HEAD 200 2026-09-25
+cell-ontology-basic	cl-basic.obo	http://purl.obolibrary.org/obo/cl/cl-basic.obo		3347518			HEAD 200 2026-09-25
+disease-ontology	doid.obo	http://purl.obolibrary.org/obo/doid.obo		7221215			HEAD 200 2026-09-25
+mondo	mondo.obo	http://purl.obolibrary.org/obo/mondo.obo		53134854			HEAD 200 2026-09-25
+human-phenotype-ontology	hp.obo	http://purl.obolibrary.org/obo/hp.obo		10863613			HEAD 200 2026-09-25
+environment-ontology	envo.obo	http://purl.obolibrary.org/obo/envo.obo		2922713			HEAD 200 2026-09-25
+ncit-flat	Thesaurus.FLAT.zip	https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/Thesaurus.FLAT.zip		16195233			HEAD 200 2026-09-25
+ncbi-taxonomy	taxdump.tar.gz	https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz			url:https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz.md5		HEAD 200 2026-09-25
+catalogue-of-life-coldp	latest_coldp.zip	https://download.catalogueoflife.org/col/latest_coldp.zip		1020360106			HEAD 200 2026-09-25
+gbif-backbone-taxonomy	backbone.zip	https://hosted-datasets.gbif.org/datasets/backbone/current/backbone.zip		971465842			HEAD 200 2026-09-25
+icd-11-mms	SimpleTabulation-ICD-11-MMS-en.zip	https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip		4214980			HEAD 200 2026-09-25
+qudt-units	qudt-all.ttl	https://qudt.org/download/3.5.2/qudt-all.ttl		6867319			HEAD 200 2026-09-25
+unified-astronomy-thesaurus	UAT.rdf	https://raw.githubusercontent.com/astrothesaurus/UAT/master/UAT.rdf		3216148			HEAD 200 2026-09-25
+gcmd-science-keywords	gcmd-sciencekeywords-1.rdf	https://gcmd.earthdata.nasa.gov/kms/concepts/concept_scheme/sciencekeywords/?format=rdf&page_num=1&page_size=2000					HEAD 404 (HEAD unsupported), GET 200 2026-09-25
+gcmd-science-keywords	gcmd-sciencekeywords-2.rdf	https://gcmd.earthdata.nasa.gov/kms/concepts/concept_scheme/sciencekeywords/?format=rdf&page_num=2&page_size=2000					HEAD 404 (HEAD unsupported), GET 200 2026-09-25
+sweet-ontology	sweetAll	http://sweetontology.net/sweetAll					HEAD 200 2026-09-25 (chunked, no Content-Length)
+ipcc-ar6-reference-regions	IPCC-WGI-reference-regions-v4.geojson	https://raw.githubusercontent.com/IPCC-WG1/Atlas/main/reference-regions/IPCC-WGI-reference-regions-v4.geojson		695765			HEAD 200 2026-09-25
+oeis-names	names.gz	https://oeis.org/names.gz		7765495			HEAD 200 2026-09-25
+pubchem-periodic-table	pubchem-periodictable.csv	https://pubchem.ncbi.nlm.nih.gov/rest/pug/periodictable/CSV		15017			HEAD 200 2026-09-25 (chunked, no Content-Length)
+owid-co2-ghg	owid-co2-data.csv	https://owid-public.owid.io/data/co2/owid-co2-data.csv		33246106			HEAD 200 2026-09-25
+un-sdg-global-database	GetArchiveTableById	https://unstats.un.org/sdgs/UNSDGAPIV5/v1/sdg/ArchiveData/GetArchiveTableById		84485510			POST 200 2026-09-25 (headers only; 84,485,510 B text/csv)
+eurostat-toc	txt	https://ec.europa.eu/eurostat/api/dissemination/catalogue/toc/txt?lang=en					HEAD 200 2026-09-25 (chunked, no Content-Length)
+spdx-license-list	licenses.json	https://spdx.org/licenses/licenses.json		339359			HEAD 200 2026-09-25
+iana-media-types	media-types.xml	https://www.iana.org/assignments/media-types/media-types.xml		610621			HEAD 200 2026-09-25
+unicode-ucd	UCD.zip	https://www.unicode.org/Public/18.0.0/ucd/UCD.zip		5657953			HEAD 200 2026-09-25
+github-linguist-languages	languages.yml	https://raw.githubusercontent.com/github-linguist/linguist/main/lib/linguist/languages.yml		165959			HEAD 200 2026-09-25

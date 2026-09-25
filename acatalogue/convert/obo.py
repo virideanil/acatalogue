@@ -13,7 +13,8 @@
          is_obsolete  deprecated; replaced_by -> replacement; consider -> links
   [Typedef]           names and IRIs of the relations (part_of = BFO_0000050 …)
 
-Options: broader_relations (default ["part_of"]): relationship types read as hierarchy.
+Options: broader_relations (default ["part_of"]): relationship types read as hierarchy; id_prefix
+(e.g. "MONDO"): keep only the ontology's own terms, not those it imports for its logical definitions.
 """
 from __future__ import annotations
 
@@ -118,6 +119,8 @@ def convert(inputs: list[Input], w, options: dict, progress=print) -> None:
                     typedefs[ids[0]] = td
                     continue
                 if kind != "Term":
+                    continue
+                if options.get("id_prefix") and not ids[0].startswith(options["id_prefix"] + ":"):
                     continue
                 code = code_of(ids[0])
                 w.term(code, kind=kind_term)

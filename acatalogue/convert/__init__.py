@@ -118,7 +118,13 @@ def text_lines(stream: BinaryIO, encoding: str = "utf-8") -> Iterator[str]:
         text.detach()
 
 
+def raw(inputs, w, options, progress=print) -> None:
+    """No converter yet: the files are downloaded, verified and sealed, and wait for one."""
+    raise NotImplementedError("no converter for this source yet; its files are downloaded and sealed")
+
+
 def registry() -> dict[str, Callable]:
-    from . import obo, rdf, sources, tables
+    from . import lexical, obo, rdf, scholarly, sources, tables
     return {"rdf": rdf.convert, "obo": obo.convert, "csv": tables.convert_csv, "sqlite": tables.convert_sqlite,
-            **sources.CONVERTERS}
+            "wn-lmf": lexical.wn_lmf, "iana-subtags": lexical.iana_subtags, "openalex": scholarly.openalex,
+            "ror": scholarly.ror, "raw": raw, **sources.CONVERTERS}

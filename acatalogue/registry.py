@@ -29,7 +29,7 @@ FILE_COLUMNS = ["source", "name", "url", "format", "bytes", "checksum", "role", 
 PRESET_COLUMNS = ["preset", "source", "note"]
 DOMAINS = {f"acat/{d}" for d in ("arts", "belief", "earth", "everyday", "health", "language", "life", "matter", "mind",
                                  "past", "society", "technology", "thought")}
-_ID = re.compile(r"[a-z0-9][a-z0-9\-]*")
+_ID = re.compile(r"[a-z0-9][a-z0-9.\-]*")
 _SCHEME = re.compile(r"[a-z0-9][a-z0-9\-]*")
 RESERVED = {"acat", "space", "kind", "epistemic", "udc", "ddc", "lcc", "propaedia", "wd", "doc", "src"}
 
@@ -71,7 +71,7 @@ class Registry:
 def row_problems(r: dict, where: str, converters: set[str]) -> list[str]:
     out = []
     if not _ID.fullmatch(r["id"]):
-        out.append(f"{where}: id must be lower-case letters, digits and '-'")
+        out.append(f"{where}: id must be lower-case letters, digits, '.' and '-'")
     for k in ("title", "license", "converter", "reviewer"):
         if not r.get(k):
             out.append(f"{where}: {k} is required")
@@ -91,10 +91,13 @@ def row_problems(r: dict, where: str, converters: set[str]) -> list[str]:
     for d in filter(None, (r.get("domains") or "").split()):
         if d not in DOMAINS:
             out.append(f"{where}: unknown domain {d!r}")
-    if r.get("wikidata_property") and not re.fullmatch(r"P\d+", r["wikidata_property"]):
-        out.append(f"{where}: wikidata_property must look like P1566")
+    for item in (r.get("wikidata_property") or "").split():
+        if not re.fullmatch(r"P\d+(\|[^|\s]*\{rest\}[^|\s]*(\|\S+)?)?", item):
+            out.append(f"{where}: wikidata_property must look like P1566, P686|GO_{{rest}} or P244|{{rest}}|^sh")
     if r.get("recommend") and r["recommend"] not in ("starter", "yes", "later", "no"):
         out.append(f"{where}: recommend must be starter, yes, later or no")
+    if r.get("access") and r["access"] not in ("open", "local", "registration", "restricted", "form", "blocked"):
+        out.append(f"{where}: access must be open, local, registration, restricted, form or blocked")
     return out
 
 
@@ -152,8 +155,8 @@ def read(store=None, directory: Path | None = None) -> Registry:
         except SeedError as exc:
             reg.problems.append(str(exc))
     for sid, entry in reg.sources.items():
-        if not reg.files.get(sid):
-            reg.problems.append(f"source {sid}: no files in files.tsv")
+        if not reg.files.get(sid) and entry.get("access", "open") in ("open", "local", ""):
+            reg.problems.append(f"source {sid}: open, but no files in files.tsv")
         names = [f["name"] for f in reg.files.get(sid, [])]
         if len(names) != len(set(names)):
             reg.problems.append(f"source {sid}: two files share a name")

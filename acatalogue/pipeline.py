@@ -150,6 +150,10 @@ class Pipeline:
 
     # ── run ──
     def run(self, sources: list[str]) -> dict:
+        skipped = [s for s in sources if not self.reg.files.get(s)]
+        for s in skipped:
+            self.say(f"  {s}: no public file to download ({self.reg.sources[s].get('access') or 'none'}); skipped")
+        sources = [s for s in sources if s not in skipped]
         results: dict[str, dict] = {s: {} for s in sources}
         snaps = {s: snapshot_for(self.store, s, refresh=self.refresh) for s in sources}
         pending_files: dict[str, int] = {}
@@ -167,6 +171,10 @@ class Pipeline:
                     self.store.event(s, "seal", "error", str(exc))
                     return
                 results[s]["manifest_sha512"] = manifest
+                if self.reg.sources[s].get("converter") == "raw":
+                    self.say(f"  {s}: downloaded and sealed ({snap}); no converter yet")
+                    results[s]["sealed_only"] = True
+                    return
                 from .convert import VERSION
                 job = self.store.conn.execute("SELECT * FROM job WHERE snapshot = ? AND stage = 'convert'",
                                               (snap,)).fetchone()
@@ -187,9 +195,18 @@ class Pipeline:
                                                  "manifest_sha512": manifest, "out": str(out)})
                 conversions[fut] = s
 
-            def downloaded(fut: cf.Future, s: str, name: str) -> None:
+            def downloaded(fut: cf.Future, s: str, f: dict, raw: Path) -> None:
+                name = f["name"]
                 try:
                     fut.result()
+                    if (f.get("format") or "").startswith("manifest:"):
+                        # a publisher's manifest names the parts of this release: they join the snapshot
+                        for t in self.expand(s, snaps[s][0], f, raw):
+                            with self.lock:
+                                pending_files[s] += 1
+                            nf = dpool.submit(self.dl.fetch, t)
+                            nf.add_done_callback(lambda fu, s=s, pf={"name": t.name}: downloaded(fu, s, pf, raw))
+                            futures.append((s, nf))
                 except Exception as exc:
                     with self.lock:
                         results[s].setdefault("failed_files", []).append(f"{name}: {exc}")
@@ -210,7 +227,7 @@ class Pipeline:
                              expected_bytes=int(f["bytes"]) if (f.get("bytes") or "").isdigit() else None,
                              license=self.reg.sources[s].get("license"), attribution=self.reg.sources[s].get("publisher"))
                     fut = dpool.submit(self.dl.fetch, t)
-                    fut.add_done_callback(lambda fu, s=s, n=f["name"]: downloaded(fu, s, n))
+                    fut.add_done_callback(lambda fu, s=s, f=f, raw=raw: downloaded(fu, s, f, raw))
                     futures.append((s, fut))
                 self.say(f"  {s}: {len(files)} file(s) queued into {self.store.rel(raw)}")
             started: set[str] = set()
@@ -245,6 +262,28 @@ class Pipeline:
         if self.integrate_after:
             results["_integration"] = self.integrate([s for s in sources if results[s].get("lean")])
         return results
+
+    def expand(self, s: str, snap: str, f: dict, raw: Path) -> list[Task]:
+        """The part files a downloaded manifest names (OpenAlex: s3:// URLs served over HTTPS)."""
+        kind = f["format"].split(":", 1)[1]
+        if kind != "openalex":
+            raise ValueError(f"unknown manifest kind {kind!r}")
+        data = json.loads((raw / f["name"]).read_bytes())
+        rewrite = self.reg.options(s).get("manifest_rewrite")
+        stem = f["name"].rsplit("-manifest", 1)[0]
+        tasks = []
+        for entry in data.get("files", []):
+            url = entry["url"].replace("s3://openalex/", "https://openalex.s3.amazonaws.com/")
+            if rewrite:
+                url = url.replace(*rewrite)
+            part = url.rstrip("/").split("/")
+            name = f"{stem}-{part[-2].replace('updated_date=', '')}-{part[-1]}"
+            size = (entry.get("meta") or {}).get("content_length")
+            tasks.append(Task(s, snap, name, url, raw / name, expected_bytes=size,
+                              license=self.reg.sources[s].get("license"),
+                              attribution=self.reg.sources[s].get("publisher")))
+        self.say(f"  {s}: {f['name']} names {len(tasks)} part(s)")
+        return tasks
 
     def _converted(self, s: str, snap: str, fut: cf.Future, results: dict) -> None:
         try:

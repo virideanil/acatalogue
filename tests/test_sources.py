@@ -161,12 +161,14 @@ class PipelineTests(unittest.TestCase):
 
     def test_resolver(self):
         r = Resolver([{"id": "go", "iri_prefixes": "http://purl.obolibrary.org/obo/GO_|GO_{rest}",
-                       "curie_prefixes": "GO|GO_{rest} MSH", "wikidata_property": "P686"},
+                       "curie_prefixes": "GO|GO_{rest} MSH", "wikidata_property": "P686|GO_{rest}"},
+                      {"id": "yso", "wikidata_property": "P2347|p{rest}"},
                       {"id": "geonames", "iri_prefixes": "https://sws.geonames.org/"}])
         self.assertEqual(r("http://purl.obolibrary.org/obo/GO_0008150"), "go/GO_0008150")
         self.assertEqual(r("GO:0008150"), "go/GO_0008150")
         self.assertEqual(r("MSH:D002453"), "go/D002453")
-        self.assertEqual(r("P686:GO_1"), "go/GO_1")
+        self.assertEqual(r("P686:GO:0007568"), "go/GO_0007568")          # Wikidata's own value form
+        self.assertEqual(r("P2347:10238"), "yso/p10238")
         self.assertEqual(r("https://sws.geonames.org/745044/"), "geonames/745044")
         self.assertEqual(r("http://www.wikidata.org/entity/Q1"), "wd/Q1")
         self.assertIsNone(r("https://unknown.example/x"))

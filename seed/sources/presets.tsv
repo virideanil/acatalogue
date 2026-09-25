@@ -1,0 +1,112 @@
+preset	source	note
+starter	oewn-2025-plus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	openalex-topics	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	schema-org	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	physh	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	lcgft	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	ndlsh	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	ndc9-jla	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	unesco-thesaurus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	gemet	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	stw	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	mesh-xml	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	geonames-cities15000	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	glottolog-languoid-csv	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	iana-language-subtag-registry	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	cldr-localenames-full	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	periodo-dataset	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	gene-ontology-basic	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	disease-ontology	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	environment-ontology	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	unified-astronomy-thesaurus	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	gcmd-science-keywords	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+starter	pubchem-periodic-table	A small, open, varied starting point: every domain, many languages and several traditions of ordering knowledge, about 340 MB
+languages	iana-language-subtag-registry	Languages and their names
+languages	cldr-localenames-full	Languages and their names
+languages	glottolog-languoid-csv	Languages and their names
+languages	oewn-2025-plus	Languages and their names
+places-and-time	geonames-cities15000	Places and periods
+places-and-time	cldr-localenames-full	Places and periods
+places-and-time	periodo-dataset	Places and periods
+library-subjects	unesco-thesaurus	Subject systems of libraries and thesauri, from several countries
+library-subjects	lcsh	Subject systems of libraries and thesauri, from several countries
+library-subjects	lcgft	Subject systems of libraries and thesauri, from several countries
+library-subjects	gnd-subjects	Subject systems of libraries and thesauri, from several countries
+library-subjects	ndlsh	Subject systems of libraries and thesauri, from several countries
+library-subjects	ndc9-jla	Subject systems of libraries and thesauri, from several countries
+library-subjects	yso	Subject systems of libraries and thesauri, from several countries
+library-subjects	eurovoc	Subject systems of libraries and thesauri, from several countries
+library-subjects	agrovoc	Subject systems of libraries and thesauri, from several countries
+library-subjects	gemet	Subject systems of libraries and thesauri, from several countries
+library-subjects	stw	Subject systems of libraries and thesauri, from several countries
+library-subjects	thesoz	Subject systems of libraries and thesauri, from several countries
+library-subjects	nalt	Subject systems of libraries and thesauri, from several countries
+library-subjects	mesh-xml	Subject systems of libraries and thesauri, from several countries
+life-and-health	gene-ontology-basic	Life and health ontologies
+life-and-health	disease-ontology	Life and health ontologies
+life-and-health	environment-ontology	Life and health ontologies
+life-and-health	mondo	Life and health ontologies
+life-and-health	uberon-basic	Life and health ontologies
+life-and-health	cell-ontology-basic	Life and health ontologies
+life-and-health	chebi-full	Life and health ontologies
+life-and-health	mesh-xml	Life and health ontologies
+life-and-health	ncit-flat	Life and health ontologies
+life-and-health	ncbi-taxonomy	Life and health ontologies
+sciences	openalex-topics	Classifications of the sciences and their objects
+sciences	openalex-concepts	Classifications of the sciences and their objects
+sciences	physh	Classifications of the sciences and their objects
+sciences	unified-astronomy-thesaurus	Classifications of the sciences and their objects
+sciences	gcmd-science-keywords	Classifications of the sciences and their objects
+sciences	qudt-units	Classifications of the sciences and their objects
+sciences	pubchem-periodic-table	Classifications of the sciences and their objects
+sciences	oeis-names	Classifications of the sciences and their objects
+encyclopedic	schema-org	Upper ontologies and encyclopedic classes
+encyclopedic	dbpedia-ontology	Upper ontologies and encyclopedic classes
+encyclopedic	yago-4.6-taxonomy	Upper ontologies and encyclopedic classes
+encyclopedic	omw-2.0	Upper ontologies and encyclopedic classes
+encyclopedic	ror	Upper ontologies and encyclopedic classes
+everything-recommended	dbpedia-ontology	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	yago-4.6-taxonomy	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	oewn-2025-plus	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	omw-2.0	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	openalex-topics	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	openalex-concepts	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	schema-org	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	ror	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	physh	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	lcsh	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	lcgft	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	gnd-subjects	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	ndlsh	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	ndc9-jla	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	yso	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	unesco-thesaurus	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	eurovoc	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	agrovoc	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	gemet	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	stw	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	thesoz	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	mesh-xml	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	nalt	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	geonames-cities15000	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	geonames-cities5000	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	geonames-cities1000	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	geonames-allcountries	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	glottolog-languoid-csv	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	iana-language-subtag-registry	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	cldr-localenames-full	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	periodo-dataset	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	gene-ontology-basic	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	chebi-full	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	uberon-basic	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	cell-ontology-basic	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	disease-ontology	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	mondo	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	environment-ontology	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	ncit-flat	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	ncbi-taxonomy	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	qudt-units	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	unified-astronomy-thesaurus	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	gcmd-science-keywords	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	oeis-names	every source recommended for use: several GB; large ones attach instead of merging
+everything-recommended	pubchem-periodic-table	every source recommended for use: several GB; large ones attach instead of merging

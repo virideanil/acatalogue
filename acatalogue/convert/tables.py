@@ -100,7 +100,9 @@ class _Mapper:
         for b in s.get("broader", []):
             v = get(b["column"])
             if v not in (None, ""):
-                w.rel(code, self.pred(b.get("name", "parent"), "broader", b.get("iri")), str(v).strip())
+                for o in (str(v).split(b["split"]) if b.get("split") else [str(v)]):
+                    if o.strip():
+                        w.rel(code, self.pred(b.get("name", "parent"), "broader", b.get("iri")), o.strip())
         for r in s.get("relations", []):
             v = get(r["column"])
             if v not in (None, ""):
@@ -138,8 +140,11 @@ def convert_csv(inputs: list[Input], w, options: dict, progress=print) -> None:
                 skip = spec.get("skip_prefix")
                 lines = (ln for ln in text_lines(stream, spec.get("encoding", "utf-8-sig"))
                          if not (skip and ln.startswith(skip)))
-                reader = csv.reader(lines, delimiter=spec.get("delimiter", ","),
-                                    quoting=csv.QUOTE_NONE if spec.get("quoting") == "none" else csv.QUOTE_MINIMAL)
+                if spec.get("maxsplit") is not None:        # 'A000045 Fibonacci numbers.': split once, no quoting
+                    reader = (ln.rstrip("\r\n").split(spec.get("delimiter", " "), spec["maxsplit"]) for ln in lines)
+                else:
+                    reader = csv.reader(lines, delimiter=spec.get("delimiter", ","),
+                                        quoting=csv.QUOTE_NONE if spec.get("quoting") == "none" else csv.QUOTE_MINIMAL)
                 header = next(reader) if spec.get("header", True) else None
                 index = {h.strip(): k for k, h in enumerate(header)} if header else {}
                 for row in reader:

@@ -81,6 +81,32 @@ With "quotes" and &#233;.</skos:definition>
 </rdf:RDF>
 '''
 
+Q3 = '"' * 3
+SKOS_TTL = ("""@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix skosxl: <http://www.w3.org/2008/05/skos-xl#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+@base <http://ex.org/v/> .
+<scheme> a skos:ConceptScheme ; skos:prefLabel "Test scheme"@en .
+<c1> a skos:Concept ;
+    skos:prefLabel "Science"@en, "Bilim"@tr ;
+    skos:altLabel "Sciences"@en ;
+    skos:topConceptOf <scheme> ;
+    skos:narrower <c2> ;
+    skos:definition """ + Q3 + "Systematic knowledge.\nWith \"quotes\" and \\u00e9." + Q3 + """@en ;
+    skos:notation "5" ;
+    skos:exactMatch <http://www.wikidata.org/entity/Q336> .
+<c2> a skos:Concept ; skosxl:prefLabel [ a skosxl:Label ; skosxl:literalForm "Physics"@en ] ;
+    skos:broader <c1> ; skos:related <c3> .
+<c3> a skos:Concept ; skos:prefLabel 'Chemistry'@en ; skos:related <c2> ;
+    skos:scopeNote <note/1> ; owl:deprecated true ; dct:isReplacedBy <c2> ;
+    skos:broader <http://other.org/x/9> ; <http://ex.org/custom#weight> 12 .
+<note/1> rdf:value "Of substances."@en .
+<g> a skos:Collection ; skos:prefLabel "Group"@en ; skos:member <c3> .
+""")
+
 OBO = '''format-version: 1.2
 data-version: releases/2026-09-01
 ontology: go
@@ -188,12 +214,14 @@ class RdfTests(unittest.TestCase):
                          ("broader", "link", "notation"))
         self.assertEqual(r.conn.execute("SELECT count(*) FROM label_fts WHERE label_fts MATCH 'physics'").fetchone()[0], 1)
 
-    def test_rdfxml_reads_the_same_as_ntriples(self):
+    def test_rdfxml_and_turtle_read_the_same_as_ntriples(self):
         a = content(self.nt()[0])
         p = self.tmp / "v.rdf"
         p.write_text(SKOS_XML, encoding="utf-8")
-        b = content(run("rdf", [inp(p)], tmp=self.tmp / "b")[0])
-        self.assertEqual(a, b)
+        self.assertEqual(content(run("rdf", [inp(p)], tmp=self.tmp / "b")[0]), a)
+        t = self.tmp / "v.ttl.gz"
+        t.write_bytes(gzip.compress(SKOS_TTL.encode()))
+        self.assertEqual(content(run("rdf", [inp(t)], tmp=self.tmp / "c")[0]), a)
 
 
 class OboTests(unittest.TestCase):
