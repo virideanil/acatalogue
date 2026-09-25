@@ -94,6 +94,13 @@ def import_documents(conn: sqlite3.Connection, corpus: CorpusFile, title_to_conc
                     conn.execute("INSERT OR IGNORE INTO document_concept(doc_id, concept_id, relation, method)"
                                  " VALUES (?,?,?,?)", (doc_id, cid, "about", "wikidata-enwiki-sitelink"))
                     stats["linked"] += 1
+    # a newer corpus of the same family supersedes older documents of the same name (kept, not deleted)
+    cur = conn.execute(
+        "UPDATE document SET superseded_by = (SELECT n.id FROM document n WHERE n.corpus = ? AND n.name = document.name)"
+        " WHERE superseded_by IS NULL AND corpus LIKE 'wikipedia-en-intros-%' AND corpus <> ?"
+        " AND EXISTS (SELECT 1 FROM document n WHERE n.corpus = ? AND n.name = document.name)",
+        (corpus.name, corpus.name, corpus.name))
+    stats["superseded"] = cur.rowcount
     ledger.record(conn, actor, "import-documents", target=f"doc/{corpus.name}", detail=stats,
                   receipt=f"manifest:{corpus.manifest()}",
                   undo="documents are rebuilt from the corpus; remove the corpus file and rebuild to drop them")

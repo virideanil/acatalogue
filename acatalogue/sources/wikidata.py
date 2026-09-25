@@ -231,6 +231,11 @@ def _register_source(conn: sqlite3.Connection, corpus: CorpusFile, item_name: st
     return it["sha512"]
 
 
+def _ensure_scheme(conn: sqlite3.Connection) -> None:
+    conn.execute("INSERT INTO scheme(id, title, origin, license, homepage) VALUES"
+                 " ('wd', 'Wikidata', 'external', 'CC0 1.0', 'https://www.wikidata.org/') ON CONFLICT(id) DO NOTHING")
+
+
 def _ensure_wd_concept(conn: sqlite3.Connection, qid: str, label: str, digest: str) -> None:
     conn.execute(
         "INSERT INTO concept(id, scheme, code, label, source_sha512) VALUES (?,?,?,?,?)"
@@ -247,6 +252,7 @@ def import_entities(conn: sqlite3.Connection, corpus: CorpusFile, decisions: lis
         if d["status"] == "accepted" and d["to"].startswith("wd/"):
             by_qid.setdefault(d["to"][3:], []).append(d)
     stats = {"items": 0, "labels": 0, "copied_labels": 0, "missing": []}
+    _ensure_scheme(conn)
     # labels from any Wikidata entities corpus are regenerated from the newest one and the current decisions
     conn.execute("DELETE FROM label WHERE source_sha512 IN"
                  " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%')")
@@ -323,6 +329,7 @@ def import_decisions(conn: sqlite3.Connection, decisions: list[dict], seed_sha51
 def import_claims(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "acat build") -> dict:
     stats = {"claims": 0, "new": 0}
     now = utcnow()
+    _ensure_scheme(conn)
     for pid, label in CLAIM_PROPERTIES.items():
         conn.execute("INSERT INTO concept(id, scheme, code, label) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING",
                      (f"wd/{pid}", "wd", pid, label))
@@ -347,6 +354,12 @@ def import_claims(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "ac
                  "epistemic/superseded" if rank == "deprecated" else "epistemic/attributed", digest, now))
             stats["claims"] += 1
             stats["new"] += cur.rowcount
+    # record time moves on: claims read from an older Wikidata corpus are superseded by this one
+    # (kept, never deleted; the new corpus restates whatever is still true)
+    cur = conn.execute(
+        "UPDATE claim SET superseded_at = ? WHERE superseded_at IS NULL AND source_sha512 IN"
+        " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%' AND corpus <> ?)", (now, corpus.name))
+    stats["superseded"] = cur.rowcount
     ledger.record(conn, actor, "import-wikidata-claims", target=f"doc/{corpus.name}", detail=stats,
                   receipt=f"manifest:{corpus.manifest()}",
                   undo="claims are never deleted; a later corpus supersedes them")

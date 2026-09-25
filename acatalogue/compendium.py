@@ -16,7 +16,7 @@ from .util import REPO_ROOT, sha512_bytes, utcnow
 SEED_DIR = REPO_ROOT / "seed"
 # every version of every concept seed file ever loaded (their rows are regenerated on each build)
 SEED_CONCEPT_SOURCES = ("SELECT sha512 FROM source WHERE kind = 'seed'"
-                        " AND (name LIKE 'seed/compendium/%' OR name LIKE 'seed/schemes/%')")
+                        " AND (name LIKE '%seed/compendium/%' OR name LIKE '%seed/schemes/%')")
 CONCEPT_COLUMNS = ["code", "broader", "label", "alt", "scope_note", "related", "facets", "notation", "when"]
 ACTOR = "acat build"
 
