@@ -14,7 +14,7 @@ nuclear-physics	physics	Nuclear physics		Atomic nuclei: their structure, reactio
 atomic-and-molecular-physics	physics	Atomic and molecular physics	atomic physics|molecular physics	The structure of atoms and molecules and their interactions with light and with each other.	physical-chemistry
 condensed-matter-physics	physics	Condensed matter physics	solid-state physics	Solids and liquids: properties such as conductivity, magnetism and superconductivity that arise from many interacting particles.	materials-science
 plasma-physics	physics	Plasma physics		Ionized gases — the state of most visible matter in the universe — from stars and lightning to fusion reactors.	stars
-chemistry	matter	Chemistry		The composition, structure and properties of substances and the reactions that transform them.	physics|biochemistry
+chemistry	matter	Chemistry		The composition, structure and properties of substances and the reactions that transform them.	physics
 chemical-elements	chemistry	Chemical elements and the periodic table	periodic table	The known elements, their properties, and the periodic regularities that organize them.	nuclear-physics
 inorganic-chemistry	chemistry	Inorganic chemistry		Compounds of all elements other than those centred on carbon chains: minerals, metals, salts, coordination compounds.	mineralogy|metallurgy
 organic-chemistry	chemistry	Organic chemistry		Carbon-based compounds, their structure, reactions and synthesis.	biochemistry|polymer-chemistry
@@ -23,7 +23,7 @@ analytical-chemistry	chemistry	Analytical chemistry		Methods for identifying sub
 biochemistry	chemistry|molecular-biology	Biochemistry		The chemistry of living things: proteins, nucleic acids, metabolism and the reactions that sustain life.	cell-biology
 polymer-chemistry	chemistry	Polymer chemistry	macromolecules	Large molecules built from repeating units, natural and synthetic: plastics, rubber, fibres, proteins.	materials-science
 electrochemistry	chemistry	Electrochemistry		Chemical reactions that produce or consume electric current: batteries, electrolysis, corrosion.	energy-storage
-astronomy	matter	Astronomy and space science	space science	Celestial objects, space and the physical universe beyond Earth.	physics|spaceflight
+astronomy	matter	Astronomy and space science	space science	Celestial objects, space and the physical universe beyond Earth.	physics
 solar-system	astronomy	The Solar System		The Sun and the planets, moons, asteroids, comets and dust bound to it.	planetary-science
 planetary-science	astronomy	Planetary science		The formation, composition and evolution of planets and moons, including Earth seen as one planet among others.	geology|solar-system
 stars	astronomy	Stars and stellar astrophysics		How stars form, shine, evolve and die, and the remnants they leave.	plasma-physics

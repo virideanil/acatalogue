@@ -206,11 +206,17 @@ design goal is therefore **bias-transparency with plurality**:
 SQL it ran (`--explain`, and the `sql` field in the API):
 
 - `words` — FTS5 syntax (`AND`, `OR`, `NOT`, `"phrases"`, `prefix*`, `NEAR(sky god, 5)`), ranked by
-  BM25; invalid syntax falls back to plain words and says so;
-- `substring` (`-F`) — case-insensitive literals through a trigram index, so it works inside words
-  and in scripts without spaces (`物理` finds physics); shorter than three characters, a full scan;
-- `regex` (`-E`) — Python regular expressions; the trigram index narrows candidates only when the
-  pattern provably contains a required literal, so a match is never missed;
+  BM25; invalid syntax falls back to plain words and says so. Combining marks stay inside words
+  (Devanagari, Tamil, vocalised Arabic are no longer split), and a query in Chinese, Japanese or
+  Korean is matched through an index of overlapping character pairs, so two-character words are found;
+- `substring` (`-F`) — case-insensitive in exactly one sense everywhere: Python's `re.IGNORECASE` on
+  NFC-normalised text (so "istanbul" finds "İstanbul" and "ARI" finds "arı"). A trigram index over
+  each text's *case key* narrows the candidates and Python checks each one;
+- `regex` (`-E`) — Python regular expressions; a trigram query is extracted from the pattern with
+  Russ Cox's method (alternations and case-insensitive patterns included), and the regex decides
+  every hit. Patterns that require nothing indexable scan every row;
+- no missed matches is a tested property, not a promise: `tests/test_grep.py` compares the indexed
+  paths with a plain Python scan over all labels for randomised needles and regexes;
 - `--under acat/belief` limits hits to a subtree; `--lang tr` limits labels to a language.
 
 `acat grep-db <file.sqlite> <pattern>` greps every text column of *any* SQLite file read-only —

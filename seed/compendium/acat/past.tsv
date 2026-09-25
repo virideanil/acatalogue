@@ -1,6 +1,6 @@
 code	broader	label	alt	scope_note	related	facets	notation	when
 past		Human Past	history	The human past and how it is known: prehistory, history by period, by region and by theme, archaeology and the methods of history.	society|belief|thought
-prehistory	past	Prehistory		The human past before written records. Writing arose at different times in different places, so where prehistory ends differs by region.	archaeology|human-evolution
+prehistory	past	Prehistory		The human past before written records. Writing arose at different times in different places, so where prehistory ends differs by region.	archaeology
 palaeolithic	prehistory	Palaeolithic	Old Stone Age	From the earliest known stone tools, about 3.3 million years ago, to the end of the last glacial period, about 12,000 years ago.	rock-art			-3300000/-9700
 neolithic	prehistory	Neolithic and the beginnings of farming	agricultural revolution	The shift to farming and settled village life, which began independently in several regions and at different times from about 12,000 years ago.	crop-farming|pastoralism-and-livestock
 early-human-dispersals	prehistory	Early human dispersals	out of Africa	The spread of humans out of Africa and across every continent except Antarctica, including the peopling of Sahul and the Americas.	human-evolution|migration-and-diaspora

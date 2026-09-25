@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import ledger
+from .textkeys import nfc
 from .util import REPO_ROOT, sha512_bytes, utcnow
 
 SEED_DIR = REPO_ROOT / "seed"
@@ -179,6 +180,23 @@ def validate_scheme(scheme: str, rows: list[ConceptRow]) -> list[str]:
                 stack.append((nxt, iter(by_code[nxt].broader)))
     if not any(not r.broader for r in rows):
         problems.append(f"{scheme}: no top concept (every concept has a broader)")
+    # SKOS S27: a related link must not restate the hierarchy (no related link to an ancestor)
+    ancestors: dict[str, set[str]] = {}
+
+    def ancestors_of(code: str) -> set[str]:
+        if code not in ancestors:
+            ancestors[code] = set()                      # guard against cycles, reported above
+            out: set[str] = set()
+            for b in by_code[code].broader if code in by_code else []:
+                if b in by_code:
+                    out |= {b} | ancestors_of(b)
+            ancestors[code] = out
+        return ancestors[code]
+    for r in rows:
+        for rel in r.related:
+            if rel in by_code and (rel in ancestors_of(r.code) or r.code in ancestors_of(rel)):
+                problems.append(f"{r.source.rel}:{r.line}: {r.code} lists {rel!r} as related, but one is an"
+                                f" ancestor of the other (SKOS S27)")
     return problems
 
 
@@ -262,10 +280,10 @@ def load_concepts(conn: sqlite3.Connection, schemes: dict[str, list[ConceptRow]]
     for scheme, rows in schemes.items():
         for r in rows:
             conn.execute("INSERT OR IGNORE INTO label(concept_id, lang, kind, text, source_sha512) VALUES (?,?,?,?,?)",
-                         (r.id, "en", "pref", r.label, r.source.sha512))
+                         (r.id, "en", "pref", nfc(r.label), r.source.sha512))
             for a in r.alt:
                 conn.execute("INSERT OR IGNORE INTO label(concept_id, lang, kind, text, source_sha512)"
-                             " VALUES (?,?,?,?,?)", (r.id, "en", "alt", a, r.source.sha512))
+                             " VALUES (?,?,?,?,?)", (r.id, "en", "alt", nfc(a), r.source.sha512))
             for b in r.broader:
                 conn.execute("INSERT OR IGNORE INTO broader(child, parent, source_sha512) VALUES (?,?,?)",
                              (r.id, f"{scheme}/{b}", r.source.sha512))

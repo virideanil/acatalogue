@@ -2,13 +2,15 @@
 
 Three modes over the same catalogue, and every answer carries the exact SQL that produced it:
 
-  words      FTS5 query syntax (AND / OR / NOT, "phrases", prefix*, NEAR(...)), ranked by BM25
-  substring  a literal, case-insensitive; accelerated by the trigram index (works inside words and
-             in scripts without spaces, e.g. Chinese or Japanese); patterns under three characters
-             fall back to a full scan
-  regex      a Python regular expression; when the pattern provably contains a literal run of three
-             or more characters (case-sensitive, no top-level alternation) the trigram index narrows
-             the candidates first, otherwise every row is scanned — never a missed match
+  words      FTS5 query syntax (AND / OR / NOT, "phrases", prefix*, NEAR(...)), ranked by BM25;
+             combining marks stay inside words; a query with Chinese, Japanese or Korean text is
+             matched through an index of overlapping character pairs, so two-character words are found
+  substring  a literal, case-insensitive in exactly the sense of Python's re.IGNORECASE on NFC text;
+             candidates come from a trigram index over each text's case key (textkeys.py), and every
+             candidate is checked with Python — so İstanbul is found by "istanbul", and nothing is missed
+  regex      a Python regular expression; a trigram query is extracted from the pattern (Russ Cox's
+             method) to narrow the candidates whenever the pattern allows it, otherwise every row is
+             scanned; the regex itself decides every hit
 
 `grep_any` greps every text column of any SQLite file (read-only), for databases that are not
 catalogues at all.
@@ -22,10 +24,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .db import register_functions
+from .textkeys import KEY_VERSION, cjk_query, fts_phrase, has_cjk, literal_query, nfc, trigram_query
 
 MODES = ("words", "substring", "regex")
 SCOPES = ("all", "concepts", "passages", "labels")
 START, END = "\x02", "\x03"
+_CJK_PAIR = re.compile(r"^[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]{2}$")
 
 
 @dataclass
@@ -109,19 +113,20 @@ def parts_from_spans(text: str, spans: list[tuple[int, int]], context: int = 70)
 
 
 def _spans_literal(text: str, needle: str) -> list[tuple[int, int]]:
-    return [(m.start(), m.end()) for m in re.finditer(re.escape(needle), text, re.IGNORECASE)]
+    return [(m.start(), m.end()) for m in re.finditer(re.escape(nfc(needle)), text, re.IGNORECASE)][:20]
 
 
 def _spans_regex(text: str, rx: re.Pattern) -> list[tuple[int, int]]:
     return [(m.start(), m.end()) for m in rx.finditer(text) if m.end() > m.start()][:20]
 
 
-# ─── query helpers ───────────────────────────────────────────────────────────
-
-
-def fts_phrase(literal: str) -> str:
-    """A literal as one FTS5 string (double quotes doubled)."""
-    return '"' + literal.replace('"', '""') + '"'
+def _spans_tokens(text: str, query: str) -> list[tuple[int, int]]:
+    spans = []
+    for tok in nfc(query).split():
+        tok = tok.strip('"()*')
+        if tok and tok.upper() not in ("AND", "OR", "NOT"):
+            spans += [(m.start(), m.end()) for m in re.finditer(re.escape(tok), text, re.IGNORECASE)]
+    return sorted(spans)[:20]
 
 
 def plain_words(query: str) -> str:
@@ -129,34 +134,7 @@ def plain_words(query: str) -> str:
     return " ".join(fts_phrase(t) for t in query.split())
 
 
-def required_literal(pattern: str) -> str | None:
-    """The longest literal run (>= 3 chars) that every match of `pattern` must contain, or None.
-    Conservative: only top-level literal runs, only for case-sensitive patterns without top-level
-    alternation — so a trigram prefilter built from it can never exclude a true match."""
-    try:
-        from re import _constants as C, _parser as P      # Python >= 3.11
-    except ImportError:                                  # pragma: no cover
-        import sre_constants as C                        # type: ignore
-        import sre_parse as P                            # type: ignore
-    try:
-        parsed = P.parse(pattern)
-    except Exception:
-        return None
-    if parsed.state.flags & re.IGNORECASE:
-        return None
-    best, run = "", []
-    for op, av in parsed:
-        if op is C.LITERAL:
-            run.append(chr(av))
-            continue
-        if op is C.BRANCH:
-            return None
-        if len(run) > len(best):
-            best = "".join(run)
-        run = []
-    if len(run) > len(best):
-        best = "".join(run)
-    return best if len(best) >= 3 else None
+# ─── query helpers ───────────────────────────────────────────────────────────
 
 
 def _subtree_cte(under: str | None) -> tuple[str, list]:
@@ -175,6 +153,11 @@ def _concepts_of_docs(conn: sqlite3.Connection, doc_ids: list[str]) -> dict[str,
                              " ORDER BY concept_id", doc_ids):
         out.setdefault(d, []).append(c)
     return out
+
+
+def _keys_current(conn: sqlite3.Connection) -> bool:
+    row = conn.execute("SELECT value FROM meta WHERE key = 'key_version'").fetchone()
+    return row is not None and row[0] == KEY_VERSION
 
 
 # ─── the grepper ─────────────────────────────────────────────────────────────
@@ -197,14 +180,18 @@ def grep(conn: sqlite3.Connection, pattern: str, *, mode: str = "words", scope: 
             rx = re.compile(pattern)
         except re.error as exc:
             raise GrepError(f"invalid regular expression: {exc}") from exc
+    use_keys = mode == "words" or _keys_current(conn)
+    if not use_keys:
+        res.notes.append(f"the case-key index was built for another Unicode/Python version than {KEY_VERSION}:"
+                         " every row is scanned (rebuild with `acat build` to use the index)")
     scopes = ("concepts", "passages", "labels") if scope == "all" else (scope,)
     for sc in scopes:
         if mode == "words":
-            _words(conn, res, sc, pattern, limit, under, lang)
+            _words(conn, res, sc, pattern, limit, under, lang, context)
         elif mode == "substring":
-            _substring(conn, res, sc, pattern, limit, under, lang, context)
+            _substring(conn, res, sc, nfc(pattern), limit, under, lang, context, use_keys)
         else:
-            _regex(conn, res, sc, pattern, rx, limit, under, lang, context)
+            _regex(conn, res, sc, pattern, rx, limit, under, lang, context, use_keys)
     res.elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
     return res
 
@@ -214,15 +201,33 @@ def _run(conn: sqlite3.Connection, res: GrepResult, sql: str, params: list) -> l
     return conn.execute(sql, params).fetchall()
 
 
-def _words(conn, res: GrepResult, sc: str, q: str, limit: int, under, lang) -> None:
+def _note(res: GrepResult, note: str) -> None:
+    if note not in res.notes:
+        res.notes.append(note)
+
+
+def _fts(conn, res: GrepResult, sql: str, before: list, q: str, after: list) -> list[sqlite3.Row]:
+    try:
+        return _run(conn, res, sql, before + [q] + after)
+    except sqlite3.OperationalError as exc:
+        # FTS5 reports bad query syntax in several ways ('syntax error', 'no such column' for a
+        # hyphenated word read as a column filter, ...). Retry once as plain words; a real fault
+        # fails again and propagates.
+        fallback = plain_words(q)
+        _note(res, f"not valid FTS5 syntax ({exc}); searched as plain words: {fallback}")
+        res.sql.pop()
+        return _run(conn, res, sql, before + [fallback] + after)
+
+
+def _words(conn, res: GrepResult, sc: str, q: str, limit: int, under, lang, context: int) -> None:
+    q = nfc(q)
     cte, cte_p = _subtree_cte(under)
     if sc == "concepts":
         sql = (cte + "SELECT f.id, f.label, snippet(concept_fts, -1, ?, ?, '…', 24) AS snip,"
                " bm25(concept_fts, 0.0, 10.0, 5.0, 1.0) AS rank FROM concept_fts f"
                " WHERE concept_fts MATCH ?" + (" AND f.id IN (SELECT id FROM sub)" if under else "") +
                " ORDER BY rank LIMIT ?")
-        rows = _fts(conn, res, sql, cte_p + [START, END], q, [limit])
-        for r in rows:
+        for r in _fts(conn, res, sql, cte_p + [START, END], q, [limit]):
             res.hits.append(Hit(target=r[0], type="concept", title=r[1], parts=parts_from_markers(r[2]),
                                 score=round(-r[3], 4), concepts=[r[0]]))
     elif sc == "passages":
@@ -236,67 +241,73 @@ def _words(conn, res: GrepResult, sc: str, q: str, limit: int, under, lang) -> N
         for r in rows:
             res.hits.append(Hit(target=f"{r[1]}#p{r[2]}", type="passage", title=r[3], parts=parts_from_markers(r[4]),
                                 score=round(-r[5], 4), concepts=concepts.get(r[1], [])))
+    elif has_cjk(q):
+        _note(res, "Chinese/Japanese/Korean text in the query: labels matched through the character-pair index")
+        sql = (cte + "SELECT l.concept_id, l.lang, l.text, c.label, bm25(label_cjk) AS rank FROM label_cjk"
+               " JOIN label l ON l.id = label_cjk.rowid JOIN concept c ON c.id = l.concept_id"
+               " WHERE label_cjk MATCH ? AND c.scheme <> 'wd'" + (" AND l.lang = ?" if lang else "") +
+               (" AND l.concept_id IN (SELECT id FROM sub)" if under else "") + " ORDER BY rank LIMIT ?")
+        for cid, lng, text, label, rank in _fts(conn, res, sql, cte_p, cjk_query(q), ([lang] if lang else []) + [limit]):
+            res.hits.append(Hit(target=cid, type="label", title=label,
+                                parts=parts_from_spans(text, _spans_tokens(text, q), context),
+                                score=round(-rank, 4), concepts=[cid], lang=lng))
     else:
         sql = (cte + "SELECT l.concept_id, l.lang, l.kind, highlight(label_fts, 3, ?, ?) AS hl, bm25(label_fts) AS rank,"
                " c.label FROM label_fts l JOIN concept c ON c.id = l.concept_id"
                " WHERE label_fts MATCH ? AND c.scheme <> 'wd'" + (" AND l.lang = ?" if lang else "") +
                (" AND l.concept_id IN (SELECT id FROM sub)" if under else "") + " ORDER BY rank LIMIT ?")
-        rows = _fts(conn, res, sql, cte_p + [START, END], q, ([lang] if lang else []) + [limit])
-        for r in rows:
+        for r in _fts(conn, res, sql, cte_p + [START, END], q, ([lang] if lang else []) + [limit]):
             res.hits.append(Hit(target=r[0], type="label", title=r[5], parts=parts_from_markers(r[3]),
                                 score=round(-r[4], 4), concepts=[r[0]], lang=r[1]))
 
 
-def _fts(conn, res: GrepResult, sql: str, before: list, q: str, after: list) -> list[sqlite3.Row]:
-    try:
-        return _run(conn, res, sql, before + [q] + after)
-    except sqlite3.OperationalError as exc:
-        # FTS5 reports bad query syntax in several ways ('syntax error', 'no such column' for a
-        # hyphenated word read as a column filter, ...). Retry once as plain words; a real fault
-        # fails again and propagates.
-        fallback = plain_words(q)
-        note = f"not valid FTS5 syntax ({exc}); searched as plain words: {fallback}"
-        if note not in res.notes:
-            res.notes.append(note)
-        res.sql.pop()
-        return _run(conn, res, sql, before + [fallback] + after)
-
-
-def _substring(conn, res: GrepResult, sc: str, needle: str, limit: int, under, lang, context: int) -> None:
+def _substring(conn, res: GrepResult, sc: str, needle: str, limit: int, under, lang, context: int,
+               use_keys: bool) -> None:
     cte, cte_p = _subtree_cte(under)
-    use_tri = len(needle) >= 3
-    if not use_tri and not any("full scan" in n for n in res.notes):
-        res.notes.append("pattern shorter than 3 characters: full scan instead of the trigram index")
+    lit = literal_query(needle) if use_keys else None
+    pair = use_keys and sc == "labels" and bool(_CJK_PAIR.match(needle))
+    if lit:
+        _note(res, f"case-key trigram index narrows candidates ({lit}); each one is checked with Python re")
+    elif pair:
+        _note(res, "two-character CJK needle: the character-pair index narrows the labels")
+    else:
+        _note(res, "no index can narrow this needle: every row is checked with Python re")
     if sc == "concepts":
-        where = "concept_tri MATCH ?" if use_tri else "casefold_contains(t.text, ?)"
-        sql = (cte + "SELECT t.id, c.label, t.text FROM concept_tri t JOIN concept c ON c.id = t.id WHERE " + where +
-               (" AND t.id IN (SELECT id FROM sub)" if under else "") + " ORDER BY length(c.label), t.id LIMIT ?")
-        rows = _run(conn, res, sql, cte_p + [fts_phrase(needle) if use_tri else needle, limit])
+        src = "concept_key k JOIN concept c ON c.id = k.id"
+        where = ("concept_key MATCH ? AND " if lit else "") + "acat_icontains(k.text, ?)"
+        sql = (cte + f"SELECT k.id, c.label, k.text FROM {src} WHERE {where}" +
+               (" AND k.id IN (SELECT id FROM sub)" if under else "") + " ORDER BY length(c.label), k.id LIMIT ?")
+        rows = _run(conn, res, sql, cte_p + ([lit] if lit else []) + [needle, limit])
         for cid, label, text in rows:
             res.hits.append(Hit(target=cid, type="concept", title=label,
                                 parts=parts_from_spans(text, _spans_literal(text, needle), context),
                                 score=1.0, concepts=[cid]))
     elif sc == "passages":
-        where = "passage_tri MATCH ?" if use_tri else "casefold_contains(p.text, ?)"
-        src = ("passage_tri JOIN passage p ON p.id = passage_tri.rowid" if use_tri else "passage p")
+        src = "passage_key JOIN passage p ON p.id = passage_key.rowid" if lit else "passage p"
         sql = (cte + f"SELECT p.id, p.doc_id, p.ord, d.title, p.text FROM {src} JOIN document d ON d.id = p.doc_id"
-               f" WHERE {where} AND d.superseded_by IS NULL" +
+               " WHERE " + ("passage_key MATCH ? AND " if lit else "") +
+               "acat_icontains(p.text, ?) AND d.superseded_by IS NULL" +
                (" AND p.doc_id IN (SELECT doc_id FROM document_concept WHERE concept_id IN (SELECT id FROM sub))"
                 if under else "") + " ORDER BY p.doc_id, p.ord LIMIT ?")
-        rows = _run(conn, res, sql, cte_p + [fts_phrase(needle) if use_tri else needle, limit])
+        rows = _run(conn, res, sql, cte_p + ([lit] if lit else []) + [needle, limit])
         concepts = _concepts_of_docs(conn, [r[1] for r in rows])
         for pid, doc, ord_, title, text in rows:
             res.hits.append(Hit(target=f"{doc}#p{ord_}", type="passage", title=title,
                                 parts=parts_from_spans(text, _spans_literal(text, needle), context),
                                 score=1.0, concepts=concepts.get(doc, [])))
     else:
-        where = "label_tri MATCH ?" if use_tri else "casefold_contains(l.text, ?)"
-        sql = (cte + "SELECT l.concept_id, l.lang, l.text, c.label FROM label_tri l JOIN concept c ON c.id = l.concept_id"
-               f" WHERE {where} AND c.scheme <> 'wd'" + (" AND l.lang = ?" if lang else "") +
+        if lit:
+            src, pre, params = "label_key JOIN label l ON l.id = label_key.rowid", "label_key MATCH ? AND ", [lit]
+        elif pair:
+            src, pre, params = "label_cjk JOIN label l ON l.id = label_cjk.rowid", "label_cjk MATCH ? AND ", \
+                [fts_phrase(needle)]
+        else:
+            src, pre, params = "label l", "", []
+        sql = (cte + f"SELECT l.concept_id, l.lang, l.text, c.label FROM {src} JOIN concept c ON c.id = l.concept_id"
+               f" WHERE {pre}acat_icontains(l.text, ?) AND c.scheme <> 'wd'" + (" AND l.lang = ?" if lang else "") +
                (" AND l.concept_id IN (SELECT id FROM sub)" if under else "") +
                " ORDER BY length(l.text), l.concept_id LIMIT ?")
-        rows = _run(conn, res, sql, cte_p + [fts_phrase(needle) if use_tri else needle] + ([lang] if lang else [])
-                    + [limit])
+        rows = _run(conn, res, sql, cte_p + params + [needle] + ([lang] if lang else []) + [limit])
         for cid, lng, text, label in rows:
             res.hits.append(Hit(target=cid, type="label", title=label,
                                 parts=parts_from_spans(text, _spans_literal(text, needle), context),
@@ -304,42 +315,42 @@ def _substring(conn, res: GrepResult, sc: str, needle: str, limit: int, under, l
 
 
 def _regex(conn, res: GrepResult, sc: str, pattern: str, rx: re.Pattern, limit: int, under, lang,
-           context: int) -> None:
+           context: int, use_keys: bool) -> None:
     cte, cte_p = _subtree_cte(under)
-    lit = required_literal(pattern)
-    note = (f"trigram prefilter on the literal {lit!r}, then REGEXP" if lit
-            else "no safe literal to prefilter on: every row is scanned with REGEXP")
-    if note not in res.notes:
-        res.notes.append(note)
-    pre = [fts_phrase(lit)] if lit else []
+    q = trigram_query(pattern) if use_keys else None
+    _note(res, f"trigram query from the regex narrows candidates ({q}); the regex decides every hit" if q
+          else "the regex gives no usable trigram: every row is checked with REGEXP")
+    pre = [q] if q else []
     if sc == "concepts":
-        sql = (cte + "SELECT t.id, c.label, t.text FROM concept_tri t JOIN concept c ON c.id = t.id WHERE " +
-               ("concept_tri MATCH ? AND " if lit else "") + "t.text REGEXP ?" +
-               (" AND t.id IN (SELECT id FROM sub)" if under else "") + " ORDER BY length(c.label), t.id LIMIT ?")
-        rows = _run(conn, res, sql, cte_p + pre + [pattern, limit])
-        for cid, label, text in rows:
+        sql = (cte + "SELECT k.id, c.label, k.text FROM concept_key k JOIN concept c ON c.id = k.id WHERE " +
+               ("concept_key MATCH ? AND " if q else "") + "k.text REGEXP ?" +
+               (" AND k.id IN (SELECT id FROM sub)" if under else "") + " ORDER BY length(c.label), k.id LIMIT ?")
+        for cid, label, text in _run(conn, res, sql, cte_p + pre + [pattern, limit]):
+            text = nfc(text)
             res.hits.append(Hit(target=cid, type="concept", title=label,
                                 parts=parts_from_spans(text, _spans_regex(text, rx), context), score=1.0,
                                 concepts=[cid]))
     elif sc == "passages":
-        src = "passage_tri JOIN passage p ON p.id = passage_tri.rowid" if lit else "passage p"
+        src = "passage_key JOIN passage p ON p.id = passage_key.rowid" if q else "passage p"
         sql = (cte + f"SELECT p.id, p.doc_id, p.ord, d.title, p.text FROM {src} JOIN document d ON d.id = p.doc_id"
-               " WHERE " + ("passage_tri MATCH ? AND " if lit else "") + "p.text REGEXP ? AND d.superseded_by IS NULL" +
+               " WHERE " + ("passage_key MATCH ? AND " if q else "") + "p.text REGEXP ? AND d.superseded_by IS NULL" +
                (" AND p.doc_id IN (SELECT doc_id FROM document_concept WHERE concept_id IN (SELECT id FROM sub))"
                 if under else "") + " ORDER BY p.doc_id, p.ord LIMIT ?")
         rows = _run(conn, res, sql, cte_p + pre + [pattern, limit])
         concepts = _concepts_of_docs(conn, [r[1] for r in rows])
         for pid, doc, ord_, title, text in rows:
+            text = nfc(text)
             res.hits.append(Hit(target=f"{doc}#p{ord_}", type="passage", title=title,
                                 parts=parts_from_spans(text, _spans_regex(text, rx), context), score=1.0,
                                 concepts=concepts.get(doc, [])))
     else:
-        sql = (cte + "SELECT l.concept_id, l.lang, l.text, c.label FROM label_tri l JOIN concept c ON c.id = l.concept_id"
-               " WHERE " + ("label_tri MATCH ? AND " if lit else "") + "l.text REGEXP ? AND c.scheme <> 'wd'" +
+        src = "label_key JOIN label l ON l.id = label_key.rowid" if q else "label l"
+        sql = (cte + f"SELECT l.concept_id, l.lang, l.text, c.label FROM {src} JOIN concept c ON c.id = l.concept_id"
+               " WHERE " + ("label_key MATCH ? AND " if q else "") + "l.text REGEXP ? AND c.scheme <> 'wd'" +
                (" AND l.lang = ?" if lang else "") + (" AND l.concept_id IN (SELECT id FROM sub)" if under else "") +
                " ORDER BY length(l.text), l.concept_id LIMIT ?")
-        rows = _run(conn, res, sql, cte_p + pre + [pattern] + ([lang] if lang else []) + [limit])
-        for cid, lng, text, label in rows:
+        for cid, lng, text, label in _run(conn, res, sql, cte_p + pre + [pattern] + ([lang] if lang else []) + [limit]):
+            text = nfc(text)
             res.hits.append(Hit(target=cid, type="label", title=label,
                                 parts=parts_from_spans(text, _spans_regex(text, rx), context), score=1.0,
                                 concepts=[cid], lang=lng))
@@ -360,7 +371,8 @@ class AnyHit:
 
 def grep_any(path: str | Path, pattern: str, *, mode: str = "substring", limit_per_column: int = 20,
              tables: list[str] | None = None, context: int = 60) -> tuple[list[AnyHit], list[str]]:
-    """Grep every text column of every ordinary table in any SQLite file, read-only."""
+    """Grep every text column of every ordinary table in any SQLite file, read-only, with the same
+    case-insensitive semantics as `grep` (Python re.IGNORECASE on NFC text)."""
     conn = sqlite3.connect(f"file:{Path(path)}?mode=ro", uri=True)
     register_functions(conn)
     conn.execute("PRAGMA query_only = 1")
@@ -386,10 +398,11 @@ def grep_any(path: str | Path, pattern: str, *, mode: str = "substring", limit_p
                 key_expr = " || '|' || ".join('"' + c.replace('"', '""') + '"' for c in pk) or "NULL"
             for col in cols:
                 cq = '"' + col.replace('"', '""') + '"'
-                test = f"{cq} REGEXP ?" if mode == "regex" else f"casefold_contains({cq}, ?)"
-                sql = (f"SELECT {key_expr}, {cq} FROM {q} WHERE typeof({cq}) = 'text' AND {test} LIMIT ?")
+                test = f"{cq} REGEXP ?" if mode == "regex" else f"acat_icontains({cq}, ?)"
+                sql = f"SELECT {key_expr}, {cq} FROM {q} WHERE typeof({cq}) = 'text' AND {test} LIMIT ?"
                 sqls.append(sql)
                 for key, text in conn.execute(sql, (pattern, limit_per_column)):
+                    text = nfc(text)
                     spans = _spans_regex(text, rx) if rx else _spans_literal(text, pattern)
                     hits.append(AnyHit(table=name, column=col, key=str(key),
                                        parts=parts_from_spans(text, spans, context)))

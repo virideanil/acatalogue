@@ -13,6 +13,7 @@ import urllib.parse
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
 from ..fetch import Fetcher
+from ..textkeys import nfc
 from ..util import today_compact, utcnow
 
 API = "https://en.wikipedia.org/w/api.php"
@@ -66,7 +67,7 @@ def import_documents(conn: sqlite3.Connection, corpus: CorpusFile, title_to_conc
             for r in data.get(step, []):
                 alias[r["to"]] = alias.get(r["from"], r["from"])
         for page in data.get("pages", []):
-            text = (page.get("extract") or "").strip()
+            text = nfc((page.get("extract") or "").strip())
             if page.get("missing") or not text:
                 stats["empty"] += 1
                 continue

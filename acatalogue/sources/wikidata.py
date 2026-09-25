@@ -12,6 +12,7 @@ from pathlib import Path
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
 from ..fetch import Fetcher
+from ..textkeys import nfc
 from ..util import REPO_ROOT, today_compact, utcnow
 
 API = "https://www.wikidata.org/w/api.php"
@@ -271,19 +272,25 @@ def import_entities(conn: sqlite3.Connection, corpus: CorpusFile, decisions: lis
             stats["items"] += 1
             rows = []
             for lang, v in labels.items():
-                rows.append((lang, "pref", v["value"]))
+                rows.append((lang, "pref", nfc(v["value"])))
             for lang, vs in ent.get("aliases", {}).items():
-                rows += [(lang, "alt", v["value"]) for v in vs]
+                rows += [(lang, "alt", nfc(v["value"])) for v in vs]
             for lang, v in ent.get("descriptions", {}).items():
-                rows.append((lang, "desc", v["value"]))
+                rows.append((lang, "desc", nfc(v["value"])))
             # Labels are stored once, on the concept that uses them (exact/close matches only). The wd/
             # item keeps its English name in concept.label; its full label set stays in the corpus bytes.
             stats["labels"] += len(rows)
             for target in [d["from"] for d in by_qid.get(qid, []) if d["relation"] in LABEL_RELATIONS]:
+                prefs = {lang: text for lang, kind, text in rows if kind == "pref"}
+                prefs.update(dict(conn.execute("SELECT lang, text FROM label WHERE concept_id = ? AND kind = 'pref'",
+                                               (target,)).fetchall()))
                 for lang, kind, text in rows:
                     # our own English preferred label stays ours: Wikidata's English label becomes an alt
                     if lang == "en" and kind == "pref":
                         kind = "alt"
+                    # SKOS S13: the same literal is never both the preferred and an alternative label
+                    if kind == "alt" and prefs.get(lang) == text:
+                        continue
                     conn.execute("INSERT OR IGNORE INTO label(concept_id, lang, kind, text, source_sha512)"
                                  " VALUES (?,?,?,?,?)", (target, lang, kind, text, digest))
                     stats["copied_labels"] += 1
@@ -347,11 +354,12 @@ def import_claims(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "ac
             obj_label = b.get("valueLabel", {}).get("value", obj)
             conn.execute("INSERT INTO concept(id, scheme, code, label, source_sha512) VALUES (?,?,?,?,?)"
                          " ON CONFLICT(id) DO NOTHING", (f"wd/{obj}", "wd", obj, obj_label, digest))
+            # Wikidata's deprecated rank is kept as the source's own rank; it is not a withdrawal by the
+            # source (it also marks "never correct" values), so the epistemic status stays attributed
             cur = conn.execute(
                 "INSERT OR IGNORE INTO claim(subject, predicate, object, rank, epistemic, source_sha512, recorded_at)"
                 " VALUES (?,?,?,?,?,?,?)",
-                (f"wd/{subj}", f"wd/{b['pid']['value']}", f"wd/{obj}", rank,
-                 "epistemic/superseded" if rank == "deprecated" else "epistemic/attributed", digest, now))
+                (f"wd/{subj}", f"wd/{b['pid']['value']}", f"wd/{obj}", rank, "epistemic/attributed", digest, now))
             stats["claims"] += 1
             stats["new"] += cur.rowcount
     # record time moves on: claims read from an older Wikidata corpus are superseded by this one

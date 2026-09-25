@@ -4,7 +4,7 @@ cell-biology	life	Cell biology	cytology	The structure and function of cells, the
 molecular-biology	life	Molecular biology		How DNA, RNA and proteins carry, express and regulate genetic information.	genetics
 genetics	life	Genetics	heredity	Genes, heredity and variation in living things.	evolution
 genomics	genetics	Genomics		Whole genomes: their sequencing, structure, function and comparison.	molecular-biology|data-and-databases
-evolution	life	Evolution	evolutionary biology	Descent with modification: how populations change over generations through natural selection and other processes.	genetics|palaeontology
+evolution	life	Evolution	evolutionary biology	Descent with modification: how populations change over generations through natural selection and other processes.	genetics
 speciation	evolution	Speciation		How new species arise.
 phylogenetics	evolution	Phylogenetics and systematics	systematics	Reconstructing the evolutionary relationships among organisms: the tree of life.	taxonomy-biology
 origin-of-life	evolution	Origin of life	abiogenesis	How life first arose from non-living chemistry.	astrobiology|creation-narratives

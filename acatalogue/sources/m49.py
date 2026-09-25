@@ -6,6 +6,7 @@ import sqlite3
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
 from ..fetch import Fetcher
+from ..textkeys import nfc
 from ..util import today_compact, utcnow
 from .htmltables import tables
 
@@ -97,7 +98,7 @@ def import_into(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "acat
         for lang, text in langs.items():
             if text:
                 conn.execute("INSERT OR IGNORE INTO label(concept_id, lang, kind, text, source_sha512)"
-                             " VALUES (?,?,?,?,?)", (f"space/m49-{code}", lang, "pref", text, digest))
+                             " VALUES (?,?,?,?,?)", (f"space/m49-{code}", lang, "pref", nfc(text), digest))
     for child, par in parent.items():
         conn.execute("INSERT OR IGNORE INTO broader(child, parent, source_sha512) VALUES (?,?,?)",
                      (f"space/m49-{child}", f"space/m49-{par}", digest))

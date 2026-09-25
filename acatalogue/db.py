@@ -6,6 +6,7 @@ import sqlite3
 from functools import lru_cache
 from pathlib import Path
 
+from .textkeys import fold_key, icontains, nfc
 from .util import REPO_ROOT
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
@@ -19,21 +20,21 @@ def _compiled(pattern: str) -> re.Pattern[str]:
 
 
 def _regexp(pattern: str | None, text: str | None) -> int:
-    """SQL: `text REGEXP pattern` (SQLite calls regexp(pattern, text))."""
+    """SQL: `text REGEXP pattern` (SQLite calls regexp(pattern, text)); matched on NFC text."""
     if pattern is None or text is None:
         return 0
-    return 1 if _compiled(pattern).search(text) else 0
+    return 1 if _compiled(pattern).search(nfc(text)) else 0
 
 
-def _casefold_contains(text: str | None, needle: str | None) -> int:
-    if text is None or needle is None:
-        return 0
-    return 1 if needle.casefold() in text.casefold() else 0
+def _icontains(text: str | None, needle: str | None) -> int:
+    """SQL: acat_icontains(text, needle) — the one case-insensitive substring test (textkeys.icontains)."""
+    return 1 if icontains(text, needle) else 0
 
 
 def register_functions(conn: sqlite3.Connection) -> None:
     conn.create_function("regexp", 2, _regexp, deterministic=True)
-    conn.create_function("casefold_contains", 2, _casefold_contains, deterministic=True)
+    conn.create_function("acat_icontains", 2, _icontains, deterministic=True)
+    conn.create_function("acat_key", 1, lambda s: None if s is None else fold_key(nfc(s)), deterministic=True)
 
 
 def check_sqlite() -> None:
@@ -75,6 +76,8 @@ def connect(path: str | Path = DEFAULT_DB, *, readonly: bool = False, create: bo
 
 def init_schema(conn: sqlite3.Connection) -> None:
     check_sqlite()
+    from .migrate import migrate
+    migrate(conn)                      # upgrade an older database in place first (rows copied, ledgered)
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     conn.commit()
 

@@ -7,20 +7,47 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import random
+import re
+import shutil
+
 from acatalogue import db as dbm
-from acatalogue.grep import (GrepError, grep, grep_any, parts_from_markers, parts_from_spans, plain_words,
-                             required_literal)
+from acatalogue.grep import GrepError, grep, grep_any, parts_from_markers, parts_from_spans, plain_words
 from acatalogue.sources.wikidata import _JUNK
+from acatalogue.textkeys import (closure_violations, cjk_bigrams, fold_key, icontains, literal_query, nfc,
+                                 trigram_query)
+
+
+class TextKeyTests(unittest.TestCase):
+    def test_key_fold_is_closed_over_all_of_unicode(self):
+        self.assertEqual(closure_violations(), [])
+
+    def test_one_definition_of_case_insensitive(self):
+        for text, needle in [("İstanbul", "istanbul"), ("arı kovanı", "ARI"), ("ISPARTA", "ısparta"),
+                             ("Kelvin 5K", "5k"), ("Café", "CAFÉ")]:
+            with self.subTest(text=text, needle=needle):
+                self.assertEqual(icontains(text, needle),
+                                 re.search(re.escape(needle), text, re.IGNORECASE) is not None)
+                if icontains(text, needle):
+                    self.assertIn(fold_key(nfc(needle)), fold_key(nfc(text)))
+
+    def test_nfc(self):
+        self.assertTrue(icontains("Café", "Café"))              # decomposed text, composed needle
+
+    def test_trigram_queries(self):
+        self.assertIn("levi", trigram_query("Leviath[a-z]+"))
+        self.assertIn(" OR ", trigram_query("Leviathan|Behemoth"))    # alternation is indexable now
+        self.assertIsNotNone(trigram_query("(?i)physics"))            # so is case-insensitivity
+        self.assertEqual(trigram_query("abc?d"), '("abcd" OR "abd")')
+        self.assertIsNone(trigram_query("a.*b"))                      # nothing required: scan
+        self.assertIsNone(trigram_query("(unclosed"))
+        self.assertIsNone(literal_query("ab"))                        # never a string under 3 characters
+
+    def test_cjk_pairs(self):
+        self.assertEqual(cjk_bigrams("物理学").split(), ["物理", "理学"])
 
 
 class HelperTests(unittest.TestCase):
-    def test_required_literal_is_conservative(self):
-        self.assertEqual(required_literal("Leviath[a-z]+"), "Leviath")
-        self.assertEqual(required_literal("xyz(abc|def)"), "xyz")
-        self.assertIsNone(required_literal("Leviathan|Behemoth"))     # top-level alternation
-        self.assertIsNone(required_literal("(?i)physics"))            # case-insensitive
-        self.assertIsNone(required_literal("abc?d"))                  # no required run of 3
-        self.assertIsNone(required_literal("(unclosed"))
 
     def test_parts(self):
         self.assertEqual(parts_from_markers("a \x02b\x03 c"), [{"t": "a ", "m": False}, {"t": "b", "m": True},
@@ -84,10 +111,71 @@ class CatalogueTests(unittest.TestCase):
     def test_regex_prefilter_and_scan_agree(self):
         a = grep(self.conn, "Leviath[a-z]+", mode="regex", scope="concepts")
         b = grep(self.conn, "(Leviath[a-z]+|Behemoth)", mode="regex", scope="concepts")
-        self.assertIn("acat/legendary-creatures", [h.target for h in a.hits])
-        self.assertIn("acat/legendary-creatures", [h.target for h in b.hits])
+        c = grep(self.conn, "Levi.*than", mode="regex", scope="concepts")
+        for r in (a, b, c):
+            self.assertIn("acat/legendary-creatures", [h.target for h in r.hits])
         self.assertIn("MATCH", a.sql[0])
-        self.assertNotIn("MATCH", b.sql[0])
+        self.assertIn("MATCH", b.sql[0])                             # alternation: OR of trigram sets
+
+    def test_dotted_capital_i(self):
+        texts = [t for (t,) in self.conn.execute("SELECT text FROM label WHERE text LIKE '%İ%' LIMIT 5")]
+        self.assertTrue(texts)
+        needle = texts[0].replace("İ", "i")[:8]
+        res = grep(self.conn, needle, mode="substring", scope="labels", limit=100)
+        self.assertTrue(any(needle.casefold()[:3] in h.snippet.replace("İ", "i").casefold() for h in res.hits))
+
+    def test_combining_marks_stay_inside_words(self):
+        res = grep(self.conn, "विज्ञान", scope="labels", limit=20)
+        self.assertIn("acat/science", [h.target for h in res.hits])
+
+    def test_two_character_cjk_words(self):
+        words = grep(self.conn, "物理", scope="labels", limit=20)
+        sub = grep(self.conn, "物理", mode="substring", scope="labels", limit=20)
+        self.assertIn("acat/physics", [h.target for h in words.hits])
+        self.assertIn("acat/physics", [h.target for h in sub.hits])
+        self.assertIn("label_cjk", sub.sql[0])
+
+    def test_no_missed_matches_against_brute_force(self):
+        """Property test: the indexed paths return every label a plain Python scan finds."""
+        labels = self.conn.execute("SELECT l.concept_id, l.text FROM label l JOIN concept c ON c.id = l.concept_id"
+                                   " WHERE c.scheme <> 'wd'").fetchall()
+        pool = [t for _, t in labels if len(t) >= 6]
+        rnd = random.Random(20260925)
+
+        def frag():
+            s = rnd.choice(pool)
+            i = rnd.randrange(0, len(s) - 3)
+            return s[i:i + rnd.randint(2, 6)]
+        compared = 0
+        for _ in range(60):
+            needle = rnd.choice([str.upper, str.lower, str.swapcase, lambda s: s])(frag())
+            hits = grep(self.conn, needle, mode="substring", scope="labels", limit=500).hits
+            if len(hits) < 500:                        # the limit caps rows; compare only uncapped answers
+                want = {c for c, t in labels if icontains(t, needle)}
+                self.assertEqual(want - {h.target for h in hits}, set(), f"substring {needle!r} missed matches")
+                compared += 1
+            a, b = re.escape(frag()), re.escape(frag())
+            pattern = rnd.choice([a, f"(?i){a}", f"{a}|{b}", f"{a}.{{0,5}}{b}", f"(?:{a})+", f"{a}\\w*"])
+            rx = re.compile(pattern)
+            hits = grep(self.conn, pattern, mode="regex", scope="labels", limit=500).hits
+            if len(hits) < 500:
+                want = {c for c, t in labels if rx.search(nfc(t))}
+                self.assertEqual(want - {h.target for h in hits}, set(), f"regex {pattern!r} missed matches")
+                compared += 1
+        self.assertGreater(compared, 60, "too few uncapped cases to mean anything")
+
+    def test_label_indexes_survive_vacuum(self):
+        copy = self.tmp / "vacuumed.sqlite"
+        shutil.copy(self.db, copy)
+        w = dbm.connect(copy)
+        w.execute("VACUUM")
+        for t in ("label_fts", "passage_fts"):                         # index still agrees with its content
+            w.execute(f"INSERT INTO {t}({t}, rank) VALUES ('integrity-check', 1)")
+        w.close()
+        c = dbm.connect(copy, readonly=True)
+        for cid, text in c.execute("SELECT concept_id, text FROM label WHERE lang = 'tr' ORDER BY id LIMIT 30"):
+            if len(text) >= 3:
+                self.assertIn(cid, [h.target for h in grep(c, text, mode="substring", scope="labels", limit=500).hits])
 
     def test_under_limits_to_subtree(self):
         res = grep(self.conn, "sky", scope="passages", under="acat/belief", limit=50)

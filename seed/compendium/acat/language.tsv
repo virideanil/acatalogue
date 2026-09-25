@@ -36,7 +36,7 @@ language-isolates	languages-of-the-world	Language isolates		Languages with no de
 sign-languages	languages-of-the-world	Sign languages		Languages of the hands, face and body, used by Deaf communities worldwide.	disability
 pidgins-and-creoles	languages-of-the-world	Pidgins and creoles		Languages that arose from contact between speakers of different languages.	trade-networks|colonialism-and-decolonization
 constructed-languages	languages-of-the-world	Constructed languages	planned languages	Languages deliberately designed, such as Esperanto.
-writing-systems	language	Writing systems and scripts	scripts|orthography	The systems people use to write languages, classified by how their signs map to language.	literacy|calligraphy
+writing-systems	language	Writing systems and scripts	scripts|orthography	The systems people use to write languages, classified by how their signs map to language.	literacy
 alphabets	writing-systems	Alphabets		Scripts with separate letters for consonants and vowels, such as Latin, Greek, Cyrillic, Georgian and Hangul.
 abjads	writing-systems	Abjads	consonantal scripts	Scripts that write mainly consonants, such as Arabic, Hebrew and Syriac.
 abugidas	writing-systems	Abugidas	alphasyllabaries	Scripts in which vowels are marked on consonant letters, such as Devanagari, Tamil, Thai and Ge'ez.
@@ -51,6 +51,6 @@ propaganda	communication	Propaganda and persuasion	disinformation	Communication 
 rhetoric	communication	Rhetoric	oratory|public speaking	The art and study of persuasive speech and writing.	argumentation
 nonverbal-communication	communication	Nonverbal communication	gesture|body language	Gesture, facial expression, posture and other communication without words.
 translation-and-interpreting	communication	Translation and interpreting	translation	Carrying meaning between languages in writing and speech.
-oral-tradition	communication	Oral tradition	storytelling	Knowledge, history and art passed on by word of mouth across generations.	epic-and-oral-literature|oral-history
+oral-tradition	communication	Oral tradition	storytelling	Knowledge, history and art passed on by word of mouth across generations.	oral-history
 publishing	communication	Books and publishing	books	Producing and distributing books and other publications.	printing|libraries
 semiotics	communication	Semiotics	signs and symbols	Signs, symbols and how they produce meaning.	philosophy-of-language

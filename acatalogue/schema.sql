@@ -17,7 +17,9 @@
 --   * claims are never deleted; they are superseded
 -- Derived tables (passages, FTS indexes, stats, embeddings, layout) may be rebuilt.
 
-PRAGMA user_version = 1;
+-- user_version is the schema version; acatalogue/migrate.py upgrades older databases in place
+-- (copying every row that must never be lost) before this file runs.
+PRAGMA user_version = 2;
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -80,26 +82,15 @@ CREATE TABLE IF NOT EXISTS passage (
   UNIQUE (doc_id, ord)
 );
 
--- word search (FTS5 query syntax) and substring search (trigram) over passages
+-- Search indexes over passages, rebuilt by `acat build` (derived, so no triggers):
+--   passage_fts  word search; combining marks stay inside words (Devanagari, Tamil, vocalised Arabic)
+--   passage_key  substring/regex prefilter over the case key of the text (see acatalogue/textkeys.py);
+--                case_sensitive 1 because the key itself carries Python's case-insensitivity
 CREATE VIRTUAL TABLE IF NOT EXISTS passage_fts USING fts5(
-  text, content='passage', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
-CREATE VIRTUAL TABLE IF NOT EXISTS passage_tri USING fts5(
-  text, content='passage', content_rowid='id', tokenize='trigram');
-
-CREATE TRIGGER IF NOT EXISTS passage_ai AFTER INSERT ON passage BEGIN
-  INSERT INTO passage_fts(rowid, text) VALUES (new.id, new.text);
-  INSERT INTO passage_tri(rowid, text) VALUES (new.id, new.text);
-END;
-CREATE TRIGGER IF NOT EXISTS passage_ad AFTER DELETE ON passage BEGIN
-  INSERT INTO passage_fts(passage_fts, rowid, text) VALUES ('delete', old.id, old.text);
-  INSERT INTO passage_tri(passage_tri, rowid, text) VALUES ('delete', old.id, old.text);
-END;
-CREATE TRIGGER IF NOT EXISTS passage_au AFTER UPDATE ON passage BEGIN
-  INSERT INTO passage_fts(passage_fts, rowid, text) VALUES ('delete', old.id, old.text);
-  INSERT INTO passage_tri(passage_tri, rowid, text) VALUES ('delete', old.id, old.text);
-  INSERT INTO passage_fts(rowid, text) VALUES (new.id, new.text);
-  INSERT INTO passage_tri(rowid, text) VALUES (new.id, new.text);
-END;
+  text, content='passage', content_rowid='id',
+  tokenize="unicode61 remove_diacritics 2 categories 'L* N* Co M*'");
+CREATE VIRTUAL TABLE IF NOT EXISTS passage_key USING fts5(
+  k, content='', detail=full, tokenize='trigram case_sensitive 1');
 
 -- which concepts a document is about (how that was decided is recorded in `method`)
 CREATE TABLE IF NOT EXISTS document_concept (
@@ -139,12 +130,13 @@ CREATE TRIGGER IF NOT EXISTS concept_never_deleted BEFORE DELETE ON concept
 BEGIN SELECT RAISE(ABORT, 'concepts are never deleted; set status = deprecated'); END;
 
 CREATE TABLE IF NOT EXISTS label (
+  id            INTEGER PRIMARY KEY,   -- stable rowid: the label indexes point at it (VACUUM-safe)
   concept_id    TEXT NOT NULL REFERENCES concept(id),
   lang          TEXT NOT NULL,         -- Wikimedia / BCP 47 language code
   kind          TEXT NOT NULL CHECK (kind IN ('pref', 'alt', 'desc')),
-  text          TEXT NOT NULL,
+  text          TEXT NOT NULL,         -- NFC-normalised
   source_sha512 TEXT REFERENCES source(sha512),
-  PRIMARY KEY (concept_id, lang, kind, text)
+  UNIQUE (concept_id, lang, kind, text)
 );
 CREATE INDEX IF NOT EXISTS label_lang ON label(lang);
 
@@ -196,40 +188,83 @@ CREATE TABLE IF NOT EXISTS attribute (    -- small typed facts about a record, e
 
 -- search indexes over the compendium (rebuilt by `acat build`)
 CREATE VIRTUAL TABLE IF NOT EXISTS concept_fts USING fts5(
-  id UNINDEXED, label, alts, scope_note, tokenize='unicode61 remove_diacritics 2');
-CREATE VIRTUAL TABLE IF NOT EXISTS concept_tri USING fts5(
-  id UNINDEXED, text, tokenize='trigram');
--- label indexes read their text from the label table itself (external content): no second copy
+  id UNINDEXED, label, alts, scope_note,
+  tokenize="unicode61 remove_diacritics 2 categories 'L* N* Co M*'");
+-- concept text for substring/regex search: `text` is what matches are checked against, `k` its case key
+CREATE VIRTUAL TABLE IF NOT EXISTS concept_key USING fts5(
+  id UNINDEXED, text UNINDEXED, k, tokenize='trigram case_sensitive 1');
+-- label word index reads its text from the label table itself (external content): no second copy
 CREATE VIRTUAL TABLE IF NOT EXISTS label_fts USING fts5(
-  concept_id UNINDEXED, lang UNINDEXED, kind UNINDEXED, text, content='label',
-  tokenize='unicode61 remove_diacritics 2');
-CREATE VIRTUAL TABLE IF NOT EXISTS label_tri USING fts5(
-  concept_id UNINDEXED, lang UNINDEXED, kind UNINDEXED, text, content='label', tokenize='trigram');
+  concept_id UNINDEXED, lang UNINDEXED, kind UNINDEXED, text, content='label', content_rowid='id',
+  tokenize="unicode61 remove_diacritics 2 categories 'L* N* Co M*'");
+-- label case-key trigram index and CJK character-pair index (contentless; rowid = label.id)
+CREATE VIRTUAL TABLE IF NOT EXISTS label_key USING fts5(
+  k, content='', detail=full, tokenize='trigram case_sensitive 1');
+CREATE VIRTUAL TABLE IF NOT EXISTS label_cjk USING fts5(
+  k, content='', detail=full, tokenize="unicode61 categories 'L* N* Co M*'");
 
 -- ─── claims: attributed statements ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS claim (
-  id            INTEGER PRIMARY KEY,
-  subject       TEXT NOT NULL,          -- scoped id
-  predicate     TEXT NOT NULL,          -- scoped id, e.g. 'wd/P279'
-  object        TEXT,                   -- scoped id when the value is a thing
-  value         TEXT,                   -- literal when it is not
-  qualifiers    TEXT,                   -- JSON object
-  rank          TEXT,                   -- the source's own rank (Wikidata: preferred/normal/deprecated)
-  epistemic     TEXT NOT NULL DEFAULT 'epistemic/attributed',
-  perspective   TEXT,                   -- whose account this is, when it is one account among several
-  valid_from    TEXT,                   -- world time (ISO 8601 / EDTF); NULL = not stated
-  valid_to      TEXT,
-  source_sha512 TEXT NOT NULL REFERENCES source(sha512),
-  recorded_at   TEXT NOT NULL,          -- record time: when this catalogue learned it
-  superseded_at TEXT,                   -- record time: when a newer statement replaced it
-  CHECK ((object IS NULL) <> (value IS NULL))
+  id              INTEGER PRIMARY KEY,
+  subject         TEXT NOT NULL,        -- scoped id
+  predicate       TEXT NOT NULL,        -- scoped id, e.g. 'wd/P279'
+  snak_type       TEXT NOT NULL DEFAULT 'value'
+                  CHECK (snak_type IN ('value', 'somevalue', 'novalue')),  -- a value / "unknown value" / "no value"
+  object          TEXT,                 -- scoped id when the value is a thing
+  value           TEXT,                 -- literal (JSON for structured values) when it is not
+  datatype        TEXT,                 -- the source's datatype, e.g. 'time', 'quantity', 'string'
+  qualifiers      TEXT,                 -- JSON summary for simple sources; see claim_qualifier
+  rank            TEXT,                 -- the source's own rank (Wikidata: preferred/normal/deprecated)
+  statement_id    TEXT,                 -- the source's own statement identifier (Wikidata statement GUID)
+  source_revision INTEGER,              -- the revision of the source record the statement was read from
+  source_pointer  TEXT,                 -- RFC 6901 JSON Pointer into the source bytes
+  epistemic       TEXT NOT NULL DEFAULT 'epistemic/attributed',
+  perspective     TEXT,                 -- whose account this is, when it is one account among several
+  valid_from      TEXT,                 -- world time (ISO 8601 / EDTF / Wikidata time); NULL = not stated
+  valid_to        TEXT,
+  time_precision  INTEGER,              -- Wikidata precision code (9 year, 10 month, 11 day …)
+  source_sha512   TEXT NOT NULL REFERENCES source(sha512),
+  recorded_at     TEXT NOT NULL,        -- record time: when this catalogue learned it
+  superseded_at   TEXT,                 -- record time: when a newer statement replaced it
+  CHECK (snak_type <> 'value' OR ((object IS NULL) <> (value IS NULL))),
+  CHECK (snak_type = 'value' OR (object IS NULL AND value IS NULL))
 );
+-- two statements with the same value but different qualifiers are different statements
+CREATE UNIQUE INDEX IF NOT EXISTS claim_statement ON claim(statement_id, source_sha512)
+  WHERE statement_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS claim_identity
-  ON claim(subject, predicate, coalesce(object, ''), coalesce(value, ''), source_sha512);
+  ON claim(subject, predicate, coalesce(object, ''), coalesce(value, ''), source_sha512)
+  WHERE statement_id IS NULL;
 CREATE INDEX IF NOT EXISTS claim_subject ON claim(subject);
 CREATE INDEX IF NOT EXISTS claim_object ON claim(object);
 CREATE TRIGGER IF NOT EXISTS claim_never_deleted BEFORE DELETE ON claim
 BEGIN SELECT RAISE(ABORT, 'claims are never deleted; set superseded_at'); END;
+
+CREATE TABLE IF NOT EXISTS claim_qualifier (   -- first-class qualifiers, in the source's order
+  claim_id  INTEGER NOT NULL REFERENCES claim(id),
+  ord       INTEGER NOT NULL,
+  property  TEXT NOT NULL,
+  snak_type TEXT NOT NULL CHECK (snak_type IN ('value', 'somevalue', 'novalue')),
+  object    TEXT,
+  value     TEXT,
+  datatype  TEXT,
+  PRIMARY KEY (claim_id, ord)
+);
+CREATE TABLE IF NOT EXISTS claim_reference (   -- the source's references for a statement
+  claim_id  INTEGER NOT NULL REFERENCES claim(id),
+  ref_hash  TEXT NOT NULL,              -- the source's own reference hash
+  ord       INTEGER NOT NULL,
+  property  TEXT NOT NULL,              -- e.g. 'wd/P248' stated in, 'wd/P854' reference URL
+  snak_type TEXT NOT NULL CHECK (snak_type IN ('value', 'somevalue', 'novalue')),
+  object    TEXT,
+  value     TEXT,
+  datatype  TEXT,
+  PRIMARY KEY (claim_id, ref_hash, ord)
+);
+CREATE TRIGGER IF NOT EXISTS claim_qualifier_never_deleted BEFORE DELETE ON claim_qualifier
+BEGIN SELECT RAISE(ABORT, 'qualifiers belong to claims and are never deleted'); END;
+CREATE TRIGGER IF NOT EXISTS claim_reference_never_deleted BEFORE DELETE ON claim_reference
+BEGIN SELECT RAISE(ABORT, 'references belong to claims and are never deleted'); END;
 
 -- ─── derived: statistics, semantic vectors, layout ──────────────────────────
 CREATE TABLE IF NOT EXISTS concept_stat (

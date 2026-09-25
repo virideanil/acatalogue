@@ -220,9 +220,22 @@ def cmd_verify(args) -> int:
         print(f"corpus: {msg}" + ("" if c.sealed else "  (NOT sealed)"))
         ok &= good and c.sealed
     if Path(args.db).exists():
+        from .checks import database_checks, skos_checks
         good, n, msg = ledger.verify(_ro(args))
         print(f"ledger: {msg}")
         ok &= good
+        rw = dbm.connect(args.db)                 # FTS5 integrity-check is issued as an INSERT; it reads only
+        try:
+            problems = database_checks(rw)
+            print("database: " + ("integrity and search indexes OK" if not problems else f"{len(problems)} problems"))
+            for p in problems:
+                print("  ", p)
+            ok &= not problems
+            for name, found in skos_checks(rw).items():
+                print(f"skos {name}: " + ("OK" if not found else f"{len(found)} violations, e.g. {found[:3]}"))
+                ok &= not found
+        finally:
+            rw.close()
     return 0 if ok else 1
 
 

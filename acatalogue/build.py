@@ -14,6 +14,7 @@ from . import compendium, ledger
 from .corpusfile import CORPORA_DIR, CorpusFile
 from .db import DEFAULT_DB, connect, init_schema
 from .sources import external, m49, wikidata, wikipedia
+from .textkeys import KEY_VERSION, cjk_bigrams, fold_key, has_cjk, nfc
 from .util import REPO_ROOT, utcnow
 
 ACTOR = "acat build"
@@ -44,23 +45,32 @@ def register_corpus(conn: sqlite3.Connection, corpus: CorpusFile) -> None:
 
 
 def rebuild_search(conn: sqlite3.Connection) -> dict:
+    """Word indexes over NFC text, and case-key trigram indexes for substring/regex search
+    (see textkeys.py). All derived: rebuilt from the tables on every build."""
     conn.execute("DELETE FROM concept_fts")
-    conn.execute("DELETE FROM concept_tri")
-    conn.execute(
-        "INSERT INTO concept_fts(id, label, alts, scope_note)"
-        " SELECT c.id, c.label,"
-        "  (SELECT group_concat(text, ' | ') FROM label l WHERE l.concept_id = c.id AND l.lang = 'en' AND l.kind = 'alt'),"
-        "  c.scope_note FROM concept c WHERE c.status = 'active' AND c.scheme <> 'wd'")
-    conn.execute(
-        "INSERT INTO concept_tri(id, text)"
-        " SELECT id, label || ' | ' || coalesce(alts, '') || ' | ' || coalesce(scope_note, '') FROM concept_fts")
+    conn.execute("DELETE FROM concept_key")
+    rows = conn.execute(
+        "SELECT c.id, c.label,"
+        " (SELECT group_concat(text, ' | ') FROM label l WHERE l.concept_id = c.id AND l.lang = 'en' AND l.kind = 'alt'),"
+        " c.scope_note FROM concept c WHERE c.status = 'active' AND c.scheme <> 'wd' ORDER BY c.id").fetchall()
+    for cid, label, alts, note in rows:
+        label, alts, note = nfc(label), nfc(alts or ""), nfc(note or "")
+        conn.execute("INSERT INTO concept_fts(id, label, alts, scope_note) VALUES (?,?,?,?)", (cid, label, alts, note))
+        text = f"{label} | {alts} | {note}"
+        conn.execute("INSERT INTO concept_key(id, text, k) VALUES (?,?,?)", (cid, text, fold_key(text)))
     conn.execute("INSERT INTO label_fts(label_fts) VALUES ('rebuild')")
-    conn.execute("INSERT INTO label_tri(label_tri) VALUES ('rebuild')")
+    for t in ("label_key", "label_cjk", "passage_key"):
+        conn.execute(f"INSERT INTO {t}({t}) VALUES ('delete-all')")
+    labels = conn.execute("SELECT id, text FROM label ORDER BY id").fetchall()
+    conn.executemany("INSERT INTO label_key(rowid, k) VALUES (?, ?)", [(i, fold_key(nfc(t))) for i, t in labels])
+    conn.executemany("INSERT INTO label_cjk(rowid, k) VALUES (?, ?)",
+                     [(i, cjk_bigrams(nfc(t))) for i, t in labels if has_cjk(t)])
     conn.execute("INSERT INTO passage_fts(passage_fts) VALUES ('rebuild')")
-    conn.execute("INSERT INTO passage_tri(passage_tri) VALUES ('rebuild')")
-    counts = {t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
-              for t in ("concept_fts", "label_fts", "passage")}
-    return counts
+    passages = conn.execute("SELECT id, text FROM passage ORDER BY id").fetchall()
+    conn.executemany("INSERT INTO passage_key(rowid, k) VALUES (?, ?)", [(i, fold_key(nfc(t))) for i, t in passages])
+    conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('key_version', ?)", (KEY_VERSION,))
+    return {"concepts": len(rows), "labels": len(labels), "passages": len(passages),
+            "cjk_labels": sum(1 for _, t in labels if has_cjk(t)), "key_version": KEY_VERSION}
 
 
 def compute_stats(conn: sqlite3.Connection) -> int:
