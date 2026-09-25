@@ -22,6 +22,11 @@
   --ramp-mid: #2a78d6;
   /* Added: <mark> background = accent at 20% over surface; ink on it 9.40:1. */
   --mark-bg: #ccd6dd;
+  /* Audit chart, diverging pair + neutral (dataviz validator on #f4eedf: poles pass every check,
+     CVD dE 21.6; the neutral reads gray by design and is >= 3:1). */
+  --rr-over: #e34948;
+  --rr-under: #2a78d6;
+  --rr-neutral: #8a877c;
 }
 
 /* Sea (dark). ASSUMPTION: the --surface value #0f1c21 is pending the owner's decision. */
@@ -39,6 +44,10 @@
     --coverage-ramp: #1c5cab #256abf #2a78d6 #3987e5 #5598e7 #6da7ec #86b6ef #9ec5f4 #b7d3f6 #cde2fb;
     --ramp-mid: #5598e7;
     --mark-bg: #1c3c5c; /* added: accent at 30% over surface; ink on it 8.94:1 */
+    /* validator on #0f1c21: poles pass every check (CVD dE 19.2); neutral >= 3:1 */
+    --rr-over: #e66767;
+    --rr-under: #3987e5;
+    --rr-neutral: #8b9695;
   }
 }
 
@@ -55,6 +64,9 @@
   --coverage-ramp: #1c5cab #256abf #2a78d6 #3987e5 #5598e7 #6da7ec #86b6ef #9ec5f4 #b7d3f6 #cde2fb;
   --ramp-mid: #5598e7;
   --mark-bg: #1c3c5c;
+  --rr-over: #e66767;
+  --rr-under: #3987e5;
+  --rr-neutral: #8b9695;
 }
 
 *,
@@ -627,18 +639,222 @@ th {
   flex: 1;
 }
 
-.ramp-ends {
+.ramp-scale {
+  font-style: italic;
+  margin: 0 0 4px;
+  color: var(--ink-2);
+}
+
+.ramp-ticks {
   display: flex;
   justify-content: space-between;
   width: 220px;
   max-width: 100%;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
+}
+
+/* tree view (ARIA APG tree) */
+.tree-panel {
+  border-top: 1px solid var(--hairline);
+  padding-top: 10px;
+}
+
+.tree-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tree,
+.tree-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree {
+  max-height: 340px;
+  overflow: auto;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.tree-group {
+  padding-left: 14px;
+}
+
+.tree-item {
+  outline: none;
+}
+
+.tree-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.tree-item:focus-visible > .tree-row {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tree-item[aria-selected="true"] > .tree-row {
+  background: var(--mark-bg);
+}
+
+.twisty {
+  width: 1em;
+  flex-shrink: 0;
+  color: var(--ink-2);
+}
+
+.tree-count {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* inspector: who decided, deprecated statements */
+.badge {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-2);
+  border-left: 2px solid var(--hairline);
+  padding-left: 6px;
+}
+
+.badge.agent {
+  border-left-color: var(--muted);
+}
+
+.claims li.deprecated .plain {
+  text-decoration: line-through;
+}
+
+/* audit: representation ratio chart */
+.baseline-audit h3 {
+  font-size: 13.5px;
+  margin: 10px 0 6px;
+}
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.chart-key {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12px;
+  color: var(--ink);
   margin-bottom: 4px;
 }
 
-.ramp-scale {
+.chart-key-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+.rr-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.rr-grid {
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+
+.rr-parity {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+}
+
+.rr-tick,
+.rr-none {
+  fill: var(--ink-2);
+  font-size: 10px;
+}
+
+.rr-none {
   font-style: italic;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+
+.rr-label {
+  fill: var(--ink);
+  font-size: 11px;
+}
+
+.rr-hit {
+  fill: transparent;
+}
+
+.rr-row {
+  outline: none;
+  cursor: default;
+}
+
+.rr-row:hover .rr-hit,
+.rr-row:focus-visible .rr-hit {
+  fill: var(--hairline);
+}
+
+.rr-ci {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.rr-ci.rr-over { stroke: var(--rr-over); }
+.rr-ci.rr-under { stroke: var(--rr-under); }
+.rr-ci.rr-neutral { stroke: var(--rr-neutral); }
+
+.rr-dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.rr-dot.rr-over { fill: var(--rr-over); }
+.rr-dot.rr-under { fill: var(--rr-under); }
+.rr-dot.rr-neutral { fill: var(--rr-neutral); }
+
+.chart-tip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  min-height: 2.6em;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.chart-tip strong {
+  color: var(--ink);
+}
+
+.baseline-audit table {
+  font-size: 12px;
+}
+
+.chart-tip[hidden] {
+  display: none;
 }
 
 .tooltip {

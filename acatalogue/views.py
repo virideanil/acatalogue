@@ -1,6 +1,7 @@
 """Read-side queries shared by the CLI and the HTTP API (see docs/API.md for the shapes)."""
 from __future__ import annotations
 
+import json
 import math
 import sqlite3
 import statistics
@@ -55,12 +56,16 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
     claims = [{
         "subject": r[0], "predicate": r[1], "predicate_label": r[2], "object": r[3], "object_label": r[4],
         "value": r[5], "epistemic": r[6], "rank": r[7], "source": f"src/sha512:{r[8]}",
-        "valid_from": r[9], "valid_to": r[10]}
+        "valid_from": r[9], "valid_to": r[10], "snak_type": r[11], "datatype": r[12], "statement_id": r[13],
+        "pointer": r[14], "qualifiers": r[15], "references": r[16], "sourced": bool(r[17])}
         for r in conn.execute(
             f"SELECT cl.subject, cl.predicate, p.label, cl.object, o.label, cl.value, cl.epistemic, cl.rank,"
-            f" cl.source_sha512, cl.valid_from, cl.valid_to FROM claim cl"
+            f" cl.source_sha512, cl.valid_from, cl.valid_to, cl.snak_type, cl.datatype, cl.statement_id,"
+            f" cl.source_pointer, (SELECT count(*) FROM claim_qualifier q WHERE q.claim_id = cl.id),"
+            f" ev.references_n, ev.sourced FROM claim cl JOIN v_claim_evidence ev ON ev.claim_id = cl.id"
             f" LEFT JOIN concept p ON p.id = cl.predicate LEFT JOIN concept o ON o.id = cl.object"
-            f" WHERE cl.subject IN ({marks}) AND cl.superseded_at IS NULL ORDER BY cl.predicate, o.label", subjects)]
+            f" WHERE cl.subject IN ({marks}) AND cl.superseded_at IS NULL"
+            f" ORDER BY cl.datatype = 'external-id', coalesce(p.label, cl.predicate), o.label, cl.value", subjects)]
     documents = [{
         "id": r[0], "title": r[1], "lang": r[2], "url": r[3], "license": r[4], "attribution": r[5],
         "excerpt": (r[6] or "")[:600], "sha512": r[7]}
@@ -110,9 +115,9 @@ def node(conn: sqlite3.Connection, cid: str) -> dict | None:
     }
 
 
-def graph(conn: sqlite3.Connection, schemes: tuple[str, ...] = GRAPH_SCHEMES) -> dict:
+def graph(conn: sqlite3.Connection, schemes: tuple[str, ...] = GRAPH_SCHEMES, *, with_layout: bool = True) -> dict:
     marks = ",".join("?" * len(schemes))
-    model = _one(conn, "SELECT id FROM model ORDER BY created_at DESC LIMIT 1")
+    model = _one(conn, "SELECT id FROM model WHERE id NOT LIKE 'layout/%' ORDER BY created_at DESC LIMIT 1")
     model_id = model[0] if model else None
     rows = conn.execute(
         f"SELECT c.id, c.label, c.scheme, s.root, s.depth, s.descendants, s.docs, s.sitelinks, l.x, l.y"
@@ -152,8 +157,28 @@ def graph(conn: sqlite3.Connection, schemes: tuple[str, ...] = GRAPH_SCHEMES) ->
     schemes_out = [{"id": r[0], "title": r[1], "origin": r[2], "n": r[3]} for r in conn.execute(
         f"SELECT s.id, s.title, s.origin, count(c.id) FROM scheme s LEFT JOIN concept c ON c.scheme = s.id"
         f" AND c.status = 'active' WHERE s.id IN ({marks}) GROUP BY s.id ORDER BY s.id", schemes)]
-    return {"version": 1, "generated_at": utcnow(), "semantic_model": model_id, "schemes": schemes_out,
-            "nodes": nodes, "edges": edges}
+    out = {"version": 1, "generated_at": utcnow(), "semantic_model": model_id, "schemes": schemes_out,
+           "nodes": nodes, "edges": edges, "layout": None}
+    if with_layout:
+        _attach_layout(conn, out)
+    return out
+
+
+def _attach_layout(conn: sqlite3.Connection, g: dict) -> None:
+    """Baked positions (see bake.py) as node 'pos', and whether they were computed for this very graph."""
+    from .bake import graph_digest
+    lay = _one(conn, "SELECT id, params, input_manifest FROM model WHERE id LIKE 'layout/%'"
+                     " ORDER BY created_at DESC LIMIT 1")
+    if lay is None:
+        return
+    pos = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT target, x, y FROM layout WHERE model = ?", (lay[0],))}
+    for n in g["nodes"]:
+        p = pos.get(n["id"])
+        n["pos"] = [round(p[0], 3), round(p[1], 3)] if p else None
+    params = json.loads(lay[1] or "{}")
+    g["layout"] = {"model": lay[0], "steps": params.get("steps"), "asleep": params.get("asleep"),
+                   "complete": all(n["pos"] is not None for n in g["nodes"]),
+                   "stale": lay[2] != graph_digest(g)}
 
 
 def audit(conn: sqlite3.Connection) -> dict:

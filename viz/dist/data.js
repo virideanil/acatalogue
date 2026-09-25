@@ -35,6 +35,10 @@ export function parseGraph(json) {
         const xy = Array.isArray(xyRaw) && xyRaw.length === 2 && typeof xyRaw[0] === "number" && typeof xyRaw[1] === "number" && Number.isFinite(xyRaw[0]) && Number.isFinite(xyRaw[1])
             ? [xyRaw[0], xyRaw[1]]
             : null;
+        const posRaw = raw.pos;
+        const pos = Array.isArray(posRaw) && posRaw.length === 2 && typeof posRaw[0] === "number" && typeof posRaw[1] === "number" && Number.isFinite(posRaw[0]) && Number.isFinite(posRaw[1])
+            ? [posRaw[0], posRaw[1]]
+            : null;
         const node = {
             id: raw.id,
             label: str(raw.label, raw.id) || raw.id,
@@ -45,6 +49,7 @@ export function parseGraph(json) {
             langs: langs === null ? null : Math.max(0, Math.round(langs)),
             docs: Math.max(0, Math.floor(num(raw.docs, 0))),
             xy,
+            pos,
         };
         oldToNew[k] = nodes.length;
         byId.set(node.id, nodes.length);
@@ -84,8 +89,18 @@ export function parseGraph(json) {
         if (!schemes.some((s) => s.id === n.scheme))
             schemes.push({ id: n.scheme, title: n.scheme, origin: "", n: 0 });
     }
+    const lay = isObj(json.layout) ? json.layout : null;
+    const layout = lay
+        ? {
+            model: str(lay.model),
+            steps: numOrNull(lay.steps),
+            asleep: lay.asleep === true,
+            complete: lay.complete === true && nodes.every((n) => n.pos !== null),
+            stale: lay.stale !== false,
+        }
+        : null;
     return {
-        payload: { version: num(json.version, 0), generated_at: str(json.generated_at), schemes, nodes, edges },
+        payload: { version: num(json.version, 0), generated_at: str(json.generated_at), schemes, nodes, edges, layout },
         droppedNodes,
         droppedEdges,
         mergedDuplicates,
@@ -290,7 +305,16 @@ export function parseNode(json) {
         broader: refs(o.broader),
         narrower: refs(o.narrower),
         related: refs(o.related),
-        mappings: list(o.mappings, (m) => ({ id: str(m.id), label: str(m.label, str(m.id)), relation: str(m.relation), method: str(m.method), status: str(m.status) })),
+        mappings: list(o.mappings, (m) => ({
+            id: str(m.id),
+            label: str(m.label, str(m.id)),
+            relation: str(m.relation),
+            method: str(m.method),
+            status: str(m.status),
+            decided_by: str(m.decided_by),
+            reviewer: str(m.reviewer),
+            note: str(m.note),
+        })),
         documents: list(o.documents, (d) => ({
             id: str(d.id),
             title: str(d.title, str(d.id)),
@@ -306,12 +330,32 @@ export function parseNode(json) {
             predicate_label: str(c.predicate_label, str(c.predicate)),
             object: str(c.object),
             object_label: str(c.object_label, str(c.object)),
+            value: str(c.value),
             epistemic: str(c.epistemic),
             rank: str(c.rank),
             source: str(c.source),
+            snak_type: str(c.snak_type, "value"),
+            datatype: str(c.datatype),
+            statement_id: str(c.statement_id),
+            pointer: str(c.pointer),
+            qualifiers: num(c.qualifiers),
+            references: num(c.references),
+            sourced: c.sourced === true,
+            valid_from: str(c.valid_from),
+            valid_to: str(c.valid_to),
         })),
         neighbors: list(o.neighbors, (n) => ({ id: str(n.id), label: str(n.label, str(n.id)), score: num(n.score), model: str(n.model) })),
         provenance: list(o.provenance, (p) => ({ source: str(p.source), sha512: str(p.sha512), kind: str(p.kind) })),
+        reviews: list(o.reviews, (r) => ({
+            target: str(r.target),
+            reviewer: str(r.reviewer),
+            reviewer_kind: str(r.reviewer_kind),
+            perspective: str(r.perspective),
+            decided_at: str(r.decided_at),
+            decision: str(r.decision),
+            relation: str(r.relation),
+            rationale: str(r.rationale),
+        })),
     };
 }
 export async function fetchNode(id, signal) {
@@ -338,6 +382,78 @@ export function parseAudit(json) {
         regions: list(o.regions, (r) => ({ id: str(r.id), label: str(r.label, str(r.id)), tagged: num(r.tagged) })),
         label_languages: list(o.label_languages, (l) => ({ lang: str(l.lang), concepts: num(l.concepts) })),
         notes: arr(o.notes).map((n) => str(n)).filter((n) => n.length > 0),
+        baseline: isObj(o.baseline_audit) ? parseBaseline(o.baseline_audit) : null,
+    };
+}
+function parseLevel(v) {
+    if (!isObj(v))
+        return null;
+    const ratio = (r) => {
+        const o = isObj(r) ? r : {};
+        return { baseline: numOrNull(o.baseline), rr: numOrNull(o.rr), log2_rr: numOrNull(o.log2_rr), rr_lo: numOrNull(o.rr_lo), rr_hi: numOrNull(o.rr_hi) };
+    };
+    const dist = {};
+    if (isObj(v.distribution)) {
+        for (const [k, d] of Object.entries(v.distribution)) {
+            dist[k] = isObj(d)
+                ? { jsd_bits: num(d.jsd_bits), jsd_lo: numOrNull(d.jsd_lo), jsd_hi: numOrNull(d.jsd_hi), null_p95: numOrNull(d.null_p95), exceeds_null: d.exceeds_null === true, gini_rr: numOrNull(d.gini_rr) }
+                : null;
+        }
+    }
+    const coverage = {};
+    if (isObj(v.baseline_coverage)) {
+        for (const [k, c] of Object.entries(v.baseline_coverage)) {
+            if (isObj(c))
+                coverage[k] = { as_of: str(c.as_of), with_value: num(c.areas_with_value), areas: num(c.areas) };
+        }
+    }
+    return {
+        n: num(v.n),
+        groups: list(v.groups, (g) => {
+            const vs = {};
+            if (isObj(g.vs))
+                for (const [k, r] of Object.entries(g.vs))
+                    vs[k] = ratio(r);
+            return { id: str(g.id), label: str(g.label, str(g.id)), share: num(g.share), share_lo: num(g.share_lo), share_hi: num(g.share_hi), vs };
+        }),
+        distribution: dist,
+        entropy_norm: numOrNull(v.entropy_norm),
+        tagged_above_level: num(v.tagged_above_level),
+        untagged: num(v.untagged),
+        coverage,
+    };
+}
+function parseBaseline(o) {
+    const flags = [];
+    for (const s of arr(o.siblings).filter(isObj)) {
+        for (const f of arr(s.flags).filter(isObj)) {
+            flags.push({ parent: str(s.parent), parent_label: str(s.label, str(s.parent)), id: str(f.id), label: str(f.label, str(f.id)), subtree: num(f.subtree), median: num(f.median) });
+        }
+    }
+    const at = isObj(o.attention) ? o.attention : null;
+    const ev = isObj(o.evidence) ? o.evidence : null;
+    const evAll = ev && isObj(ev.all) ? ev.all : {};
+    const evH = ev && isObj(ev.hierarchy) ? ev.hierarchy : {};
+    const decided = [];
+    const rev = isObj(o.review) ? o.review : {};
+    if (isObj(rev.accepted_by_decider)) {
+        for (const [decider, rels] of Object.entries(rev.accepted_by_decider)) {
+            if (isObj(rels))
+                for (const [relation, n] of Object.entries(rels))
+                    decided.push({ decider, relation, n: num(n) });
+        }
+    }
+    return {
+        generated_at: str(o.generated_at),
+        regions: parseLevel(o.regions),
+        subregions: parseLevel(o.subregions),
+        sibling_flags: flags,
+        attention: at ? { median: numOrNull(at.median), median_all: numOrNull(at.median_all), changed: num(at.concepts_with_bot_editions), excluded: arr(at.excluded_editions).map((x) => str(x)) } : null,
+        evidence: ev
+            ? { statements: num(evAll.statements), sourced: num(evAll.sourced), hierarchy_statements: num(evH.statements), hierarchy_sourced: num(evH.sourced), definition: str(ev.definition) }
+            : null,
+        decided,
+        human_reviews: num(rev.human_reviews),
     };
 }
 export async function fetchAudit(signal) {
@@ -382,6 +498,7 @@ export function auditFromGraph(g, primaryScheme) {
         thinnest,
         regions: [],
         label_languages: [],
+        baseline: null,
         notes: [
             "Computed in the browser from the loaded graph because the API is not reachable.",
             "'With langs' counts concepts whose language coverage is known (langs not null); the API's 'reconciled' may differ.",

@@ -112,3 +112,16 @@ test("offline audit is computed from the graph and says so", () => {
   assert.ok(a.notes.some((n) => /computed in the browser/i.test(n)));
   assert.ok(a.thinnest.length > 0 && a.thinnest.every((t, k, xs) => k === 0 || xs[k - 1].langs <= t.langs));
 });
+
+test("parseGraph reads baked positions and says whether the layout is complete", () => {
+  const nodes = fixture.nodes.slice(0, 3).map((n, i) => ({ ...n, pos: [i, -i] }));
+  const g = parseGraph({ ...fixture, nodes, edges: [], layout: { model: "layout/physics-x", steps: 12, asleep: true, complete: true, stale: false } });
+  assert.deepEqual(g.payload.nodes.map((n) => n.pos), [[0, -0], [1, -1], [2, -2]]);
+  assert.equal(g.payload.layout.complete, true);
+  assert.equal(g.payload.layout.stale, false);
+  nodes[1] = { ...nodes[1], pos: [1, "x"] };
+  const h = parseGraph({ ...fixture, nodes, edges: [], layout: { model: "m", complete: true, stale: false } });
+  assert.equal(h.payload.nodes[1].pos, null);
+  assert.equal(h.payload.layout.complete, false, "a bad position makes the layout incomplete");
+  assert.equal(parseGraph({ ...fixture, edges: [] }).payload.layout, null);
+});

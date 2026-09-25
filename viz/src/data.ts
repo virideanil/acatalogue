@@ -26,6 +26,20 @@ export interface GraphNode {
   docs: number;
   /** Optional semantic seed position in [-1, 1]^2. */
   xy: [number, number] | null;
+  /** Position baked offline by the same physics (world units), or null. */
+  pos: [number, number] | null;
+}
+
+/** The baked layout the positions come from (see acatalogue/bake.py). */
+export interface LayoutInfo {
+  model: string;
+  steps: number | null;
+  /** The bake ended at rest (not at its step limit). */
+  asleep: boolean;
+  /** Every node has a position. */
+  complete: boolean;
+  /** The layout was computed for a different graph (positions are still a good start). */
+  stale: boolean;
 }
 
 export interface GraphEdge {
@@ -41,6 +55,7 @@ export interface GraphPayload {
   schemes: SchemeInfo[];
   nodes: GraphNode[];
   edges: GraphEdge[];
+  layout: LayoutInfo | null;
 }
 
 export type GrepMode = "words" | "substring" | "regex";
@@ -90,6 +105,21 @@ export interface MappingEntry {
   relation: string;
   method: string;
   status: string;
+  /** 'AI agent', 'human', 'seed file (no named reviewer)' or '' (offline). */
+  decided_by: string;
+  reviewer: string;
+  note: string;
+}
+
+export interface ReviewEntry {
+  target: string;
+  reviewer: string;
+  reviewer_kind: string;
+  perspective: string;
+  decided_at: string;
+  decision: string;
+  relation: string;
+  rationale: string;
 }
 
 export interface DocumentEntry {
@@ -108,9 +138,22 @@ export interface ClaimEntry {
   predicate_label: string;
   object: string;
   object_label: string;
+  /** A literal: plain text, or canonical JSON for time, quantity, monolingual text, coordinates. */
+  value: string;
   epistemic: string;
   rank: string;
   source: string;
+  /** 'value', 'somevalue' (unknown value) or 'novalue' (no value). */
+  snak_type: string;
+  datatype: string;
+  statement_id: string;
+  pointer: string;
+  qualifiers: number;
+  references: number;
+  /** Some reference says more than "imported from a Wikimedia project". */
+  sourced: boolean;
+  valid_from: string;
+  valid_to: string;
 }
 
 export interface NeighborEntry {
@@ -144,6 +187,7 @@ export interface NodeRecord {
   claims: ClaimEntry[];
   neighbors: NeighborEntry[];
   provenance: ProvenanceEntry[];
+  reviews: ReviewEntry[];
 }
 
 export interface AuditDomain {
@@ -157,6 +201,63 @@ export interface AuditDomain {
   min_langs_id: string;
 }
 
+export interface RatioVs {
+  /** The group's share of the baseline (population, land area or 1/K); null = no baseline value. */
+  baseline: number | null;
+  rr: number | null;
+  log2_rr: number | null;
+  rr_lo: number | null;
+  rr_hi: number | null;
+}
+
+export interface RegionGroup {
+  id: string;
+  label: string;
+  share: number;
+  share_lo: number;
+  share_hi: number;
+  vs: Record<string, RatioVs>;
+}
+
+export interface RegionDistribution {
+  jsd_bits: number;
+  jsd_lo: number | null;
+  jsd_hi: number | null;
+  null_p95: number | null;
+  exceeds_null: boolean;
+  gini_rr: number | null;
+}
+
+export interface RegionLevel {
+  n: number;
+  groups: RegionGroup[];
+  distribution: Record<string, RegionDistribution | null>;
+  entropy_norm: number | null;
+  tagged_above_level: number;
+  untagged: number;
+  coverage: Record<string, { as_of: string; with_value: number; areas: number }>;
+}
+
+export interface SiblingFlag {
+  parent: string;
+  parent_label: string;
+  id: string;
+  label: string;
+  subtree: number;
+  median: number;
+}
+
+export interface BaselineAudit {
+  generated_at: string;
+  regions: RegionLevel | null;
+  subregions: RegionLevel | null;
+  sibling_flags: SiblingFlag[];
+  attention: { median: number | null; median_all: number | null; changed: number; excluded: string[] } | null;
+  evidence: { statements: number; sourced: number; hierarchy_statements: number; hierarchy_sourced: number; definition: string } | null;
+  decided: Array<{ decider: string; relation: string; n: number }>;
+  human_reviews: number;
+}
+
 export interface AuditResponse {
   generated_at: string;
   domains: AuditDomain[];
@@ -164,6 +265,7 @@ export interface AuditResponse {
   regions: Array<{ id: string; label: string; tagged: number }>;
   label_languages: Array<{ lang: string; concepts: number }>;
   notes: string[];
+  baseline: BaselineAudit | null;
 }
 
 export interface StatsResponse {
@@ -222,6 +324,11 @@ export function parseGraph(json: unknown): ParsedGraph {
       Array.isArray(xyRaw) && xyRaw.length === 2 && typeof xyRaw[0] === "number" && typeof xyRaw[1] === "number" && Number.isFinite(xyRaw[0]) && Number.isFinite(xyRaw[1])
         ? [xyRaw[0], xyRaw[1]]
         : null;
+    const posRaw = raw.pos;
+    const pos: [number, number] | null =
+      Array.isArray(posRaw) && posRaw.length === 2 && typeof posRaw[0] === "number" && typeof posRaw[1] === "number" && Number.isFinite(posRaw[0]) && Number.isFinite(posRaw[1])
+        ? [posRaw[0], posRaw[1]]
+        : null;
     const node: GraphNode = {
       id: raw.id,
       label: str(raw.label, raw.id) || raw.id,
@@ -232,6 +339,7 @@ export function parseGraph(json: unknown): ParsedGraph {
       langs: langs === null ? null : Math.max(0, Math.round(langs)),
       docs: Math.max(0, Math.floor(num(raw.docs, 0))),
       xy,
+      pos,
     };
     oldToNew[k] = nodes.length;
     byId.set(node.id, nodes.length);
@@ -269,8 +377,18 @@ export function parseGraph(json: unknown): ParsedGraph {
   for (const n of nodes) {
     if (!schemes.some((s) => s.id === n.scheme)) schemes.push({ id: n.scheme, title: n.scheme, origin: "", n: 0 });
   }
+  const lay = isObj(json.layout) ? json.layout : null;
+  const layout: LayoutInfo | null = lay
+    ? {
+        model: str(lay.model),
+        steps: numOrNull(lay.steps),
+        asleep: lay.asleep === true,
+        complete: lay.complete === true && nodes.every((n) => n.pos !== null),
+        stale: lay.stale !== false,
+      }
+    : null;
   return {
-    payload: { version: num(json.version, 0), generated_at: str(json.generated_at), schemes, nodes, edges },
+    payload: { version: num(json.version, 0), generated_at: str(json.generated_at), schemes, nodes, edges, layout },
     droppedNodes,
     droppedEdges,
     mergedDuplicates,
@@ -489,7 +607,16 @@ export function parseNode(json: unknown): NodeRecord {
     broader: refs(o.broader),
     narrower: refs(o.narrower),
     related: refs(o.related),
-    mappings: list(o.mappings, (m) => ({ id: str(m.id), label: str(m.label, str(m.id)), relation: str(m.relation), method: str(m.method), status: str(m.status) })),
+    mappings: list(o.mappings, (m) => ({
+      id: str(m.id),
+      label: str(m.label, str(m.id)),
+      relation: str(m.relation),
+      method: str(m.method),
+      status: str(m.status),
+      decided_by: str(m.decided_by),
+      reviewer: str(m.reviewer),
+      note: str(m.note),
+    })),
     documents: list(o.documents, (d) => ({
       id: str(d.id),
       title: str(d.title, str(d.id)),
@@ -505,12 +632,32 @@ export function parseNode(json: unknown): NodeRecord {
       predicate_label: str(c.predicate_label, str(c.predicate)),
       object: str(c.object),
       object_label: str(c.object_label, str(c.object)),
+      value: str(c.value),
       epistemic: str(c.epistemic),
       rank: str(c.rank),
       source: str(c.source),
+      snak_type: str(c.snak_type, "value"),
+      datatype: str(c.datatype),
+      statement_id: str(c.statement_id),
+      pointer: str(c.pointer),
+      qualifiers: num(c.qualifiers),
+      references: num(c.references),
+      sourced: c.sourced === true,
+      valid_from: str(c.valid_from),
+      valid_to: str(c.valid_to),
     })),
     neighbors: list(o.neighbors, (n) => ({ id: str(n.id), label: str(n.label, str(n.id)), score: num(n.score), model: str(n.model) })),
     provenance: list(o.provenance, (p) => ({ source: str(p.source), sha512: str(p.sha512), kind: str(p.kind) })),
+    reviews: list(o.reviews, (r) => ({
+      target: str(r.target),
+      reviewer: str(r.reviewer),
+      reviewer_kind: str(r.reviewer_kind),
+      perspective: str(r.perspective),
+      decided_at: str(r.decided_at),
+      decision: str(r.decision),
+      relation: str(r.relation),
+      rationale: str(r.rationale),
+    })),
   };
 }
 
@@ -538,6 +685,74 @@ export function parseAudit(json: unknown): AuditResponse {
     regions: list(o.regions, (r) => ({ id: str(r.id), label: str(r.label, str(r.id)), tagged: num(r.tagged) })),
     label_languages: list(o.label_languages, (l) => ({ lang: str(l.lang), concepts: num(l.concepts) })),
     notes: arr(o.notes).map((n) => str(n)).filter((n) => n.length > 0),
+    baseline: isObj(o.baseline_audit) ? parseBaseline(o.baseline_audit) : null,
+  };
+}
+
+function parseLevel(v: unknown): RegionLevel | null {
+  if (!isObj(v)) return null;
+  const ratio = (r: unknown): RatioVs => {
+    const o = isObj(r) ? r : {};
+    return { baseline: numOrNull(o.baseline), rr: numOrNull(o.rr), log2_rr: numOrNull(o.log2_rr), rr_lo: numOrNull(o.rr_lo), rr_hi: numOrNull(o.rr_hi) };
+  };
+  const dist: Record<string, RegionDistribution | null> = {};
+  if (isObj(v.distribution)) {
+    for (const [k, d] of Object.entries(v.distribution)) {
+      dist[k] = isObj(d)
+        ? { jsd_bits: num(d.jsd_bits), jsd_lo: numOrNull(d.jsd_lo), jsd_hi: numOrNull(d.jsd_hi), null_p95: numOrNull(d.null_p95), exceeds_null: d.exceeds_null === true, gini_rr: numOrNull(d.gini_rr) }
+        : null;
+    }
+  }
+  const coverage: RegionLevel["coverage"] = {};
+  if (isObj(v.baseline_coverage)) {
+    for (const [k, c] of Object.entries(v.baseline_coverage)) {
+      if (isObj(c)) coverage[k] = { as_of: str(c.as_of), with_value: num(c.areas_with_value), areas: num(c.areas) };
+    }
+  }
+  return {
+    n: num(v.n),
+    groups: list(v.groups, (g) => {
+      const vs: Record<string, RatioVs> = {};
+      if (isObj(g.vs)) for (const [k, r] of Object.entries(g.vs)) vs[k] = ratio(r);
+      return { id: str(g.id), label: str(g.label, str(g.id)), share: num(g.share), share_lo: num(g.share_lo), share_hi: num(g.share_hi), vs };
+    }),
+    distribution: dist,
+    entropy_norm: numOrNull(v.entropy_norm),
+    tagged_above_level: num(v.tagged_above_level),
+    untagged: num(v.untagged),
+    coverage,
+  };
+}
+
+function parseBaseline(o: Obj): BaselineAudit {
+  const flags: SiblingFlag[] = [];
+  for (const s of arr(o.siblings).filter(isObj)) {
+    for (const f of arr(s.flags).filter(isObj)) {
+      flags.push({ parent: str(s.parent), parent_label: str(s.label, str(s.parent)), id: str(f.id), label: str(f.label, str(f.id)), subtree: num(f.subtree), median: num(f.median) });
+    }
+  }
+  const at = isObj(o.attention) ? o.attention : null;
+  const ev = isObj(o.evidence) ? o.evidence : null;
+  const evAll = ev && isObj(ev.all) ? ev.all : {};
+  const evH = ev && isObj(ev.hierarchy) ? ev.hierarchy : {};
+  const decided: BaselineAudit["decided"] = [];
+  const rev = isObj(o.review) ? o.review : {};
+  if (isObj(rev.accepted_by_decider)) {
+    for (const [decider, rels] of Object.entries(rev.accepted_by_decider)) {
+      if (isObj(rels)) for (const [relation, n] of Object.entries(rels)) decided.push({ decider, relation, n: num(n) });
+    }
+  }
+  return {
+    generated_at: str(o.generated_at),
+    regions: parseLevel(o.regions),
+    subregions: parseLevel(o.subregions),
+    sibling_flags: flags,
+    attention: at ? { median: numOrNull(at.median), median_all: numOrNull(at.median_all), changed: num(at.concepts_with_bot_editions), excluded: arr(at.excluded_editions).map((x) => str(x)) } : null,
+    evidence: ev
+      ? { statements: num(evAll.statements), sourced: num(evAll.sourced), hierarchy_statements: num(evH.statements), hierarchy_sourced: num(evH.sourced), definition: str(ev.definition) }
+      : null,
+    decided,
+    human_reviews: num(rev.human_reviews),
   };
 }
 
@@ -582,6 +797,7 @@ export function auditFromGraph(g: GraphPayload, primaryScheme: string): AuditRes
     thinnest,
     regions: [],
     label_languages: [],
+    baseline: null,
     notes: [
       "Computed in the browser from the loaded graph because the API is not reachable.",
       "'With langs' counts concepts whose language coverage is known (langs not null); the API's 'reconciled' may differ.",

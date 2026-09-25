@@ -389,6 +389,15 @@ def cmd_review(args) -> int:
     return 0
 
 
+def cmd_bake(args) -> int:
+    from .bake import bake
+    conn = dbm.connect(args.db)
+    stats = bake(conn, max_steps=args.steps)
+    print(f"baked {stats['model']}: {stats['nodes']} particles, {stats['steps']} steps"
+          f" ({'at rest' if stats['asleep'] else 'step limit reached'}), {stats['ms']} ms in Node")
+    return 0
+
+
 def cmd_fetch(args) -> int:
     from .sources import external, m49, wikidata, wikipedia
     if args.source == "m49":
@@ -508,6 +517,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("compendium-md", help="write the compendium as Markdown")
     p.add_argument("out", nargs="?", default="docs/COMPENDIUM.md")
     p.set_defaults(fn=cmd_compendium_md)
+
+    p = sub.add_parser("bake", help="bake the particle layout with the browser's own physics (needs Node)")
+    p.add_argument("--steps", type=int, default=20000, help="step limit (default 20000)")
+    p.set_defaults(fn=cmd_bake)
 
     p = sub.add_parser("review", help="human review of machine-proposed crosswalks (seed/reviews/)")
     p.add_argument("action", choices=["queue", "approve", "revise", "object"])

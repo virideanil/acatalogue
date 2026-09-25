@@ -62,19 +62,26 @@
             <label><input type="radio" name="lens" value="coverage" /> Coverage</label>
           </fieldset>
           <label class="check"><input id="semantic" type="checkbox" /> Semantic links</label>
+          <label class="check"><input id="all-links" type="checkbox" /> All links between clusters</label>
           <button id="fit" type="button" class="ghost">Fit view</button>
+          <button id="pause" type="button" class="ghost" aria-pressed="false">Pause motion</button>
         </section>
 
         <section id="inspector" class="inspector" aria-label="Inspector">
           <p class="hint">Click a particle or a result to inspect it.</p>
         </section>
 
+        <details id="tree-panel" class="tree-panel">
+          <summary>Browse the hierarchy (tree view)</summary>
+          <ul id="tree" class="tree" role="tree" aria-label="Concept hierarchy"></ul>
+        </details>
+
         <details id="audit" class="audit">
           <summary>Audit: coverage and bias (table view)</summary>
           <div id="audit-body"><p class="hint">Opens on demand.</p></div>
         </details>
 
-        <p class="keys-help">Keys: / search · Esc clear · arrows pan · + and − zoom · 0 fit. Drag empty space to pan, drag a particle to pull it.</p>
+        <p class="keys-help">Keys: / search · Esc clear · arrows pan · + and − zoom · 0 fit · p pause motion. Drag empty space to pan, drag a particle to pull it (while motion runs). Links between clusters show for the particle under the pointer or selected.</p>
       </div>
     </aside>
 

@@ -35,6 +35,25 @@ const GLOW_MAX_HITS = 40;
 const SEARCH_DEBOUNCE_MS = { api: 200, offline: 120 };
 /** Reduced-motion pre-settle limits (whichever comes first, then the layout freezes). */
 const PRESETTLE = { maxSteps: 4000, maxMs: 5000 };
+/** Remembered per viewer: whether motion is paused (WCAG 2.2.2 Pause, Stop, Hide). */
+const PAUSE_KEY = "acatalogue.paused";
+
+function readPaused(): boolean | null {
+  try {
+    const v = window.localStorage.getItem(PAUSE_KEY);
+    return v === "1" ? true : v === "0" ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+function storePaused(on: boolean): void {
+  try {
+    window.localStorage.setItem(PAUSE_KEY, on ? "1" : "0");
+  } catch {
+    // storage can be unavailable (private windows, blocked site data); the choice holds for this visit
+  }
+}
 
 type DragMode = "none" | "pan" | "particle" | "pinch";
 
@@ -67,6 +86,12 @@ class App {
   hits: Uint8Array | null = null;
   hitOrder: Int32Array | null = null;
   showSemantic = false;
+  /** Draw every link between clusters (otherwise only the selected or hovered particle's). */
+  allLinks = false;
+  /** Motion paused by the viewer: no physics steps, no glow animation. */
+  paused = false;
+  /** The field started from positions baked offline by the same physics. */
+  bakedLayout = false;
   apiOnline = false;
   reducedMotion: boolean;
   /** The camera keeps the whole field in view until the user moves it. */
@@ -116,8 +141,16 @@ class App {
         toggleTheme();
       },
       onAuditOpen: () => this.loadAudit(),
+      onPause: () => this.setPaused(!this.paused),
+      onAllLinks: (on) => {
+        this.allLinks = on;
+        this.kick();
+      },
+      onTreeSelect: (id) => this.inspectId(id, true),
     });
     this.ui.setThemeLabel(effectiveTheme());
+    this.paused = readPaused() ?? false;
+    this.ui.setPaused(this.paused);
   }
 
   // ------------------------------------------------------------ startup
@@ -141,7 +174,18 @@ class App {
     nodes.forEach((n, i) => this.index.set(n.id, i));
     const sim = new Sim(loaded.payload);
     this.sim = sim;
+    // Start from the layout baked offline by this same physics when the payload has one for
+    // every particle; a stale one (computed for a slightly different graph) relaxes from there.
+    const layout = loaded.payload.layout;
+    this.bakedLayout = layout !== null && layout.complete && sim.adopt(nodes.map((n) => n.pos));
+    if (this.bakedLayout && layout!.stale) sim.wake();
     this.renderer = new Renderer(this.canvas, nodes, sim, readTheme(), sim.primaryScheme);
+    this.ui.setTree({
+      ids: nodes.map((n) => n.id),
+      labels: nodes.map((n) => n.label),
+      roots: Array.from(sim.roots),
+      ...this.hierarchy(),
+    });
 
     this.apiOnline = loaded.source === "api" ? true : await probeApi();
     this.ui.setOffline(!this.apiOnline);
@@ -164,7 +208,7 @@ class App {
     this.renderKey();
     this.onResize();
 
-    if (this.reducedMotion) await this.presettle();
+    if (this.reducedMotion && sim.awake) await this.presettle();
     this.fitTarget();
     this.camera.cut();
     this.ready = true;
@@ -183,6 +227,9 @@ class App {
     const where = g.source === "api" ? "live API" : g.source === "static" ? "static data/graph.json" : `${file} (?\u2060graph)`;
     const synthetic = g.payload.schemes.some((s) => /synthetic/i.test(s.title) || s.origin === "synthetic") ? " · SYNTHETIC test data" : "";
     const parts = [`${g.payload.nodes.length.toLocaleString("en")} concepts`, `${sim.m.toLocaleString("en")} links`, where + synthetic];
+    const lay = g.payload.layout;
+    if (this.bakedLayout) parts.push(`layout baked offline${lay?.steps ? ` (${lay.steps.toLocaleString("en")} steps)` : ""}${lay?.stale ? ", relaxing to this graph" : ""}`);
+    else parts.push("layout settling live");
     if (!this.apiOnline) parts.push("API not reachable");
     const warn = [...g.warnings];
     if (sim.droppedEdges > 0) warn.push(`${sim.droppedEdges} edge(s) unusable by the physics`);
@@ -212,6 +259,33 @@ class App {
     this.ui.setFieldStatus(null);
   }
 
+  /** Children and parents along broader links (child -> parent), for the tree view. */
+  private hierarchy(): { children: number[][]; parents: number[][] } {
+    const sim = this.sim!;
+    const labels = this.graph!.payload.nodes.map((n) => n.label);
+    const children: number[][] = Array.from({ length: sim.n }, () => []);
+    const parents: number[][] = Array.from({ length: sim.n }, () => []);
+    for (let e = 0; e < sim.m; e++) {
+      if (sim.ekind[e] !== KIND_BROADER) continue;
+      children[sim.et[e]!]!.push(sim.es[e]!);
+      parents[sim.es[e]!]!.push(sim.et[e]!);
+    }
+    const byLabel = (a: number, b: number): number => labels[a]!.localeCompare(labels[b]!, "en");
+    for (const c of children) c.sort(byLabel);
+    // primary parent first: the shallowest, then the smallest id (as the physics places it)
+    const nodes = this.graph!.payload.nodes;
+    for (const p of parents) p.sort((a, b) => nodes[a]!.depth - nodes[b]!.depth || (nodes[a]!.id < nodes[b]!.id ? -1 : 1));
+    return { children, parents };
+  }
+
+  setPaused(on: boolean): void {
+    this.paused = on;
+    storePaused(on);
+    this.ui.setPaused(on);
+    this.describeSource();
+    this.kick();
+  }
+
   private exposeDiagnostics(): void {
     const app = this;
     Object.defineProperty(window, "__acat", {
@@ -223,6 +297,8 @@ class App {
             nodes: sim?.n ?? 0,
             edges: sim?.m ?? 0,
             awake: sim?.awake ?? false,
+            paused: app.paused,
+            bakedLayout: app.bakedLayout,
             steps: sim?.stepCount ?? 0,
             meanKE: sim ? sim.meanKinetic() : 0,
             stepMs: sim?.stepMs ?? 0,
@@ -268,12 +344,12 @@ class App {
     this.lastTime = now;
     this.perf.frames++;
     const t0 = performance.now();
-    const res = sim.advance(dt);
+    const res = this.paused ? { steps: 0, moved: false, clamped: false } : sim.advance(dt);
     this.perf.physicsMs = performance.now() - t0;
     if (res.clamped) this.perf.clamped++;
     if (this.autoFit && res.moved) this.fitTarget();
     const camMoved = cam.advance(dt);
-    const glowChanged = sim.glowFading > 0;
+    const glowChanged = !this.paused && sim.glowFading > 0;
     if (res.moved || camMoved || glowChanged || this.dirty) this.draw();
     // fps over a rolling one-second window
     if (this.perf.windowStart === 0) this.perf.windowStart = now;
@@ -283,7 +359,7 @@ class App {
       this.perf.windowStart = now;
       this.perf.windowFrames = 0;
     }
-    const active = sim.awake || !cam.resting || glowChanged || this.dirty || this.drag.mode !== "none";
+    const active = (sim.awake && !this.paused) || !cam.resting || glowChanged || this.dirty || this.drag.mode !== "none";
     if (active) window.requestAnimationFrame(this.tick);
     else {
       this.running = false;
@@ -303,6 +379,7 @@ class App {
       hits: this.hits,
       hitOrder: this.hitOrder,
       showSemantic: this.showSemantic,
+      allLinks: this.allLinks,
       glow: !this.reducedMotion,
       obstacles: this.obstacles,
     };
@@ -410,8 +487,9 @@ class App {
     }
     this.selected = i;
     this.neighbors = this.computeNeighbors(i);
-    if (!this.reducedMotion) sim.excite(i, 1);
-    sim.wake();
+    if (!this.reducedMotion && !this.paused) sim.excite(i, 1);
+    if (!this.paused) sim.wake();
+    this.ui.revealInTree(i);
     if (fly) {
       this.autoFit = false;
       const cur = this.camera.targetScale;
@@ -491,7 +569,7 @@ class App {
       const k = sim.ekind[e]!;
       if (k === KIND_BROADER) (a === i ? broader : narrower).push(ref(other));
       else if (k === KIND_RELATED) related.push(ref(other));
-      else if (k === KIND_MAPPING) mappings.push({ ...ref(other), relation: "mapping", method: "graph edge", status: "" });
+      else if (k === KIND_MAPPING) mappings.push({ ...ref(other), relation: "mapping", method: "graph edge", status: "", decided_by: "", reviewer: "", note: "" });
       else neighbors.push({ ...ref(other), score: sim.ek[e]! > 0 ? this.edgeWeight(a, b) : 0, model: "semantic edge in the graph" });
     }
     const byLabel = (x: NodeRef, y: NodeRef): number => (x.label < y.label ? -1 : x.label > y.label ? 1 : 0);
@@ -517,6 +595,7 @@ class App {
       claims: [],
       neighbors,
       provenance: [],
+      reviews: [],
     };
   }
 
@@ -691,7 +770,7 @@ class App {
       const p = this.local(e);
       this.pointers.set(e.pointerId, p);
       c.setPointerCapture(e.pointerId);
-      this.sim!.wake();
+      if (!this.paused) this.sim!.wake();
       if (this.pointers.size === 2) {
         // Two fingers: pinch zoom around their midpoint.
         const [a, b] = [...this.pointers.values()] as [{ x: number; y: number }, { x: number; y: number }];
@@ -703,7 +782,8 @@ class App {
       const i = this.hitTest(p.x, p.y);
       const wx = this.camera.screenToWorldX(p.x);
       const wy = this.camera.screenToWorldY(p.y);
-      this.drag = { mode: i >= 0 ? "particle" : "pan", pointer: e.pointerId, startX: p.x, startY: p.y, moved: false, index: i, worldX: wx, worldY: wy, pinchDist: 0 };
+      // paused: a drag that starts on a particle pans (nothing moves on its own); a click still selects
+      this.drag = { mode: i >= 0 && !this.paused ? "particle" : "pan", pointer: e.pointerId, startX: p.x, startY: p.y, moved: false, index: i, worldX: wx, worldY: wy, pinchDist: 0 };
       this.ui.hideTooltip();
       this.kick();
     });
@@ -774,7 +854,7 @@ class App {
         const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.renderer!.height : 1;
         const delta = Math.max(-240, Math.min(240, e.deltaY * unit));
         this.autoFit = false;
-        this.sim!.wake();
+        if (!this.paused) this.sim!.wake();
         this.camera.zoomAt(p.x, p.y, Math.exp(-delta * CAMERA.wheelZoom));
         this.kick();
       },
@@ -829,12 +909,15 @@ class App {
         case "0":
           this.fit();
           break;
+        case "p":
+          this.setPaused(!this.paused);
+          break;
         default:
           handled = false;
       }
       if (handled) {
         e.preventDefault();
-        this.sim?.wake();
+        if (!this.paused) this.sim?.wake();
         this.kick();
       }
     });

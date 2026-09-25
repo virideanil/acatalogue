@@ -233,3 +233,24 @@ test("bad edges are dropped, not fatal", () => {
   for (let k = 0; k < 200; k++) sim.step();
   assert.ok(Array.from(sim.x).every(Number.isFinite));
 });
+
+test("adopt: a baked layout starts at rest; an incomplete one changes nothing", () => {
+  const baker = new Sim(fixture);
+  baker.settle(20000);
+  const pos = Array.from({ length: baker.n }, (_, i) => [baker.x[i], baker.y[i]]);
+  const sim = new Sim(fixture);
+  assert.equal(sim.adopt(pos), true);
+  assert.equal(sim.awake, false, "at rest from the first frame");
+  assert.deepEqual(Array.from(sim.x), Array.from(baker.x));
+  const r = sim.advance(1 / 60);
+  assert.equal(r.moved, false, "nothing moves until disturbed");
+
+  const fresh = new Sim(fixture);
+  const before = Array.from(fresh.x);
+  const holey = pos.slice();
+  holey[3] = null;
+  assert.equal(fresh.adopt(holey), false);
+  assert.equal(fresh.adopt(pos.slice(1)), false, "wrong length");
+  assert.deepEqual(Array.from(fresh.x), before);
+  assert.equal(fresh.awake, true);
+});

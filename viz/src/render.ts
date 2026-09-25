@@ -39,6 +39,8 @@ export const RENDER = Object.freeze({
   edgeAlpha: { broader: 0.16, related: 0.08, mapping: 0.08, semantic: 0.07 },
   /** Edges touching the selected node. */
   edgeAlphaIncident: 0.55,
+  /** Edges touching the hovered node (the way to discover hidden links between clusters). */
+  edgeAlphaHover: 0.38,
   hairline: 1,
   /** Domain label sizes, tried largest first until no two domain labels overlap. */
   rootFontSizes: [13, 12, 11, 10] as readonly number[],
@@ -70,6 +72,8 @@ export interface Emphasis {
   /** Search hits in rank order (label priority). */
   hitOrder: Int32Array | null;
   showSemantic: boolean;
+  /** Draw every link between clusters; otherwise only those of the selected or hovered particle. */
+  allLinks: boolean;
   /** False under reduced motion: static highlight, no glow halos. */
   glow: boolean;
   /** Screen rectangles (CSS px) labels must avoid, e.g. the key. */
@@ -336,7 +340,11 @@ export class Renderer {
     ctx.lineWidth = RENDER.hairline;
     ctx.lineCap = "butt";
     let drawn = 0;
-    // 0: broader, 1: related + mapping, 2: semantic (only when toggled on)
+    const slot = sim.rootSlot;
+    const hov = em.hovered;
+    // 0: broader, 1: related + mapping, 2: semantic (only when toggled on). Related and mapping
+    // links between different clusters draw only on demand (All links, or the selected or
+    // hovered particle): drawn all at once they cross the whole field and hide its structure.
     const groups = em.showSemantic ? 3 : 2;
     for (let g = 0; g < groups; g++) {
       ctx.globalAlpha = (g === 0 ? RENDER.edgeAlpha.broader : g === 1 ? RENDER.edgeAlpha.related : RENDER.edgeAlpha.semantic) * dim;
@@ -348,6 +356,7 @@ export class Renderer {
         const a = es[e]!;
         const b = et[e]!;
         if (hasSel && (a === sel || b === sel)) continue;
+        if (group === 1 && !em.allLinks && slot[a] !== slot[b]) continue;
         const ax = sx[a]!;
         const ay = sy[a]!;
         const bx = sx[b]!;
@@ -355,6 +364,20 @@ export class Renderer {
         if ((ax < 0 && bx < 0) || (ax > W && bx > W) || (ay < 0 && by < 0) || (ay > H && by > H)) continue;
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
+        drawn++;
+      }
+      ctx.stroke();
+    }
+    if (hov >= 0 && hov !== sel) {
+      ctx.globalAlpha = RENDER.edgeAlphaHover;
+      ctx.beginPath();
+      for (let e = 0; e < sim.m; e++) {
+        const a = es[e]!;
+        const b = et[e]!;
+        if (a !== hov && b !== hov) continue;
+        if (kind[e] === KIND_SEMANTIC && !em.showSemantic) continue;
+        ctx.moveTo(sx[a]!, sy[a]!);
+        ctx.lineTo(sx[b]!, sy[b]!);
         drawn++;
       }
       ctx.stroke();
@@ -652,32 +675,50 @@ export class Renderer {
 
     // 2. Domain labels (always drawn): the largest size at which none overlap.
     sim.updateCentroids();
-    let domains: Array<{ slot: number; rect: Rect; x: number; y: number }> | null = null;
+    let domains: Array<{ slot: number; rect: Rect; x: number; y: number; text?: string }> | null = null;
     for (const size of RENDER.rootFontSizes) {
       domains = this.placeDomains(sim, fixed, em, W, H, size);
       if (domains) break;
     }
     let overlaps = 0;
     if (!domains) {
-      // Last resort: smallest size, centered, overlaps counted (reported in stats).
+      // Last resort (small screens): smallest size, heaviest clusters first. A label that would
+      // collide tries its short form (the words before "&"); if that collides too it is left out
+      // and counted (stats.rootOverlaps): the name is one hover or one tree step away, never
+      // drawn over another. The choice depends only on the current view.
       this.rootSize = RENDER.rootFontSizes[RENDER.rootFontSizes.length - 1]!;
       domains = [];
       const h = this.rootSize * 1.2;
-      for (let slot = 0; slot < sim.roots.length; slot++) {
-        if (this.primaryRootSlot[slot] !== 1 || sim.roots[slot] === sel) continue;
+      const slots = [...Array(sim.roots.length).keys()]
+        .filter((slot) => this.primaryRootSlot[slot] === 1 && sim.roots[slot] !== sel)
+        .sort((a, b) => sim.mass[sim.roots[b]!]! - sim.mass[sim.roots[a]!]! || a - b);
+      this.ctx.font = this.font(F_ROOT);
+      for (const slot of slots) {
         const px = sim.centroidX[slot]! * this.s + this.ox;
         const py = sim.centroidY[slot]! * this.s + this.oy;
-        const w = this.measure(sim.roots[slot]!, F_ROOT);
-        const rect: Rect = [px - w / 2 - pad, py - h / 2 - pad, px + w / 2 + pad, py + h / 2 + pad];
-        if (grid.collides(rect[0], rect[1], rect[2], rect[3])) overlaps++;
-        grid.add(rect[0], rect[1], rect[2], rect[3]);
-        domains.push({ slot, rect, x: px, y: py });
+        const full = this.labelText[sim.roots[slot]!]!;
+        const short = full.split(/\s+&\s+|,\s+/)[0]!;
+        let fitted: { rect: Rect; text: string } | null = null;
+        for (const text of short !== full ? [full, short] : [full]) {
+          const w = this.ctx.measureText(text).width + 1;
+          const rect: Rect = [px - w / 2 - pad, py - h / 2 - pad, px + w / 2 + pad, py + h / 2 + pad];
+          if (!grid.collides(rect[0], rect[1], rect[2], rect[3])) {
+            fitted = { rect, text };
+            break;
+          }
+        }
+        if (!fitted) {
+          overlaps++;
+          continue;
+        }
+        grid.add(fitted.rect[0], fitted.rect[1], fitted.rect[2], fitted.rect[3]);
+        domains.push({ slot, rect: fitted.rect, x: px, y: py, text: fitted.text });
       }
     } else {
       for (const d of domains) grid.add(d.rect[0], d.rect[1], d.rect[2], d.rect[3]);
     }
     for (const d of domains) {
-      placed.push({ text: this.labelText[sim.roots[d.slot]!]!, x: d.x, y: d.y, font: F_ROOT, color: th.ink, align: "center" });
+      placed.push({ text: d.text ?? this.labelText[sim.roots[d.slot]!]!, x: d.x, y: d.y, font: F_ROOT, color: th.ink, align: "center" });
     }
     // Other schemes' top concepts: same place, but only where they fit.
     for (let slot = 0; slot < sim.roots.length; slot++) {

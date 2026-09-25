@@ -815,6 +815,26 @@ export class Sim {
     this.sleep();
   }
 
+  /**
+   * Start from positions baked offline by this same physics (acat bake): the field is at
+   * rest from the first frame and only disturbances move it. Needs a finite position for
+   * every particle; returns false (and changes nothing) otherwise.
+   */
+  adopt(pos: ReadonlyArray<readonly [number, number] | null>): boolean {
+    if (pos.length !== this.n) return false;
+    for (let i = 0; i < this.n; i++) {
+      const p = pos[i];
+      if (!p || !Number.isFinite(p[0]) || !Number.isFinite(p[1])) return false;
+    }
+    for (let i = 0; i < this.n; i++) {
+      this.x[i] = pos[i]![0];
+      this.y[i] = pos[i]![1];
+    }
+    this.updateCentroids();
+    this.sleep();
+    return true;
+  }
+
   setSemantic(on: boolean): void {
     if (this.semantic !== on) {
       this.semantic = on;
