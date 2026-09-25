@@ -55,6 +55,8 @@ export const RENDER = Object.freeze({
   ringWidth: 2,
   /** Surface-coloured outline around emphasised marks (the 2px surface ring). */
   surfaceRing: 1.5,
+  /** Marks smaller than this radius (screen px) are drawn as area-matched squares (raster cost). */
+  squareBelowRadius: 1.75,
 });
 
 export interface Emphasis {
@@ -140,7 +142,7 @@ export class Renderer {
   private ox = 0;
   private oy = 0;
   /** Diagnostics from the last draw. */
-  stats = { particles: 0, edges: 0, labels: 0, rootLabelSize: 13, rootOverlaps: 0, rootFailed: "", ms: 0 };
+  stats = { particles: 0, edges: 0, labels: 0, rootLabelSize: 13, rootOverlaps: 0, ms: 0 };
 
   constructor(canvas: HTMLCanvasElement, nodes: readonly GraphNode[], sim: Sim, theme: Theme, primaryScheme: string) {
     this.canvas = canvas;
@@ -495,6 +497,7 @@ export class Renderer {
       order[counts[keys[i]!]!++] = i;
     }
     const TAU = Math.PI * 2;
+    const squareBelow = RENDER.squareBelowRadius;
     let k = 0;
     while (k < total) {
       const key = keys[order[k]!]!;
@@ -507,8 +510,15 @@ export class Renderer {
       while (j < total && keys[order[j]!] === key) {
         const i = order[j]!;
         const r = hollow ? Math.max(1.6, sr[i]! - 0.6) : sr[i]!;
-        ctx.moveTo(sx[i]! + r, sy[i]!);
-        ctx.arc(sx[i]!, sy[i]!, r, 0, TAU);
+        if (!hollow && r < squareBelow) {
+          // Sub-2px marks: an area-matched square rasterises far cheaper than an arc and
+          // is indistinguishable at this size.
+          const h = r * 0.886;
+          ctx.rect(sx[i]! - h, sy[i]! - h, 2 * h, 2 * h);
+        } else {
+          ctx.moveTo(sx[i]! + r, sy[i]!);
+          ctx.arc(sx[i]!, sy[i]!, r, 0, TAU);
+        }
         j++;
       }
       if (layer >= 2 && !hollow) {
@@ -570,17 +580,21 @@ export class Renderer {
     const out: Array<{ slot: number; rect: Rect; x: number; y: number }> = [];
     const pad = 2;
     const h = size * 1.2;
+    // Bigger domains claim the centered position first.
     const slots: number[] = [];
     for (let slot = 0; slot < sim.roots.length; slot++) if (this.primaryRootSlot[slot] === 1 && sim.roots[slot] !== em.selected) slots.push(slot);
+    slots.sort((a, b) => sim.clusterRadius[b]! - sim.clusterRadius[a]! || a - b);
     for (const slot of slots) {
       const r = sim.roots[slot]!;
       const px = sim.centroidX[slot]! * this.s + this.ox;
       const py = sim.centroidY[slot]! * this.s + this.oy;
       if (px < -60 || px > W + 60 || py < -20 || py > H + 20) continue;
       const w = this.measure(r, F_ROOT);
-      const off = Math.max(h, sim.clusterRadius[slot]! * this.s * 0.9 + h / 2);
+      // Centered on the centroid, else just above or below the cluster (a full line clear).
+      const line = h + 2 * pad + 2;
+      const off = Math.max(line, sim.clusterRadius[slot]! * this.s * 0.9 + h / 2);
       let placed = false;
-      for (const dy of [0, -off, off]) {
+      for (const dy of [0, -off, off, -off - line, off + line]) {
         const cy = py + dy;
         const rect: Rect = [px - w / 2 - pad, cy - h / 2 - pad, px + w / 2 + pad, cy + h / 2 + pad];
         if (trial.collides(rect[0], rect[1], rect[2], rect[3])) continue;
@@ -589,11 +603,7 @@ export class Renderer {
         placed = true;
         break;
       }
-      if (!placed) {
-        this.stats.rootFailed = this.labelText[r]!;
-        console.debug("DEBUG placeDomains fail", size, this.labelText[r], JSON.stringify({ px, py, w, h, off, placed: out.map((o) => [this.labelText[sim.roots[o.slot]!], o.rect.map(Math.round)]), obstacles: em.obstacles }));
-        return null;
-      }
+      if (!placed) return null;
     }
     return out;
   }
@@ -659,11 +669,13 @@ export class Renderer {
         const w = this.measure(sim.roots[slot]!, F_ROOT);
         const rect: Rect = [px - w / 2 - pad, py - h / 2 - pad, px + w / 2 + pad, py + h / 2 + pad];
         if (grid.collides(rect[0], rect[1], rect[2], rect[3])) overlaps++;
+        grid.add(rect[0], rect[1], rect[2], rect[3]);
         domains.push({ slot, rect, x: px, y: py });
       }
+    } else {
+      for (const d of domains) grid.add(d.rect[0], d.rect[1], d.rect[2], d.rect[3]);
     }
     for (const d of domains) {
-      grid.add(d.rect[0], d.rect[1], d.rect[2], d.rect[3]);
       placed.push({ text: this.labelText[sim.roots[d.slot]!]!, x: d.x, y: d.y, font: F_ROOT, color: th.ink, align: "center" });
     }
     // Other schemes' top concepts: same place, but only where they fit.

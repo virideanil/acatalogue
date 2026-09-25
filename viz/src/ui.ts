@@ -193,8 +193,9 @@ export class Ui {
 
   // ------------------------------------------------------------ status
 
-  setSource(text: string): void {
+  setSource(text: string, detail = ""): void {
     this.source.textContent = text;
+    this.source.title = detail;
   }
 
   setThemeLabel(current: "light" | "dark"): void {
@@ -609,8 +610,8 @@ export class Ui {
     if (a.domains.length > 0) {
       out.push(
         table(
-          "Domains",
-          ["Domain", "Concepts", offline ? "With langs" : "Reconciled", "Docs", "Median langs", "Min langs"],
+          "Domains (langs: Wikipedia language editions per concept)",
+          ["Domain", "Concepts", offline ? "Known" : "Reconciled", "Docs", "Median", "Min"],
           a.domains.map((d) => [idCell(d.id, d.label), n(d.concepts), n(d.reconciled), n(d.docs), n(d.median_langs), d.min_langs_id ? idCell(d.min_langs_id, n(d.min_langs)) : n(d.min_langs)]),
           [false, true, true, true, true, true],
         ),

@@ -173,8 +173,9 @@ export class Ui {
         this.panelToggle.textContent = open ? "Hide panel" : "Show panel";
     }
     // ------------------------------------------------------------ status
-    setSource(text) {
+    setSource(text, detail = "") {
         this.source.textContent = text;
+        this.source.title = detail;
     }
     setThemeLabel(current) {
         this.themeButton.textContent = current === "dark" ? "Light theme" : "Dark theme";
@@ -569,7 +570,7 @@ export class Ui {
         };
         const n = (v) => (v === null ? "—" : fmt.format(Math.round(v * 10) / 10));
         if (a.domains.length > 0) {
-            out.push(table("Domains", ["Domain", "Concepts", offline ? "With langs" : "Reconciled", "Docs", "Median langs", "Min langs"], a.domains.map((d) => [idCell(d.id, d.label), n(d.concepts), n(d.reconciled), n(d.docs), n(d.median_langs), d.min_langs_id ? idCell(d.min_langs_id, n(d.min_langs)) : n(d.min_langs)]), [false, true, true, true, true, true]));
+            out.push(table("Domains (langs: Wikipedia language editions per concept)", ["Domain", "Concepts", offline ? "Known" : "Reconciled", "Docs", "Median", "Min"], a.domains.map((d) => [idCell(d.id, d.label), n(d.concepts), n(d.reconciled), n(d.docs), n(d.median_langs), d.min_langs_id ? idCell(d.min_langs_id, n(d.min_langs)) : n(d.min_langs)]), [false, true, true, true, true, true]));
         }
         if (a.thinnest.length > 0) {
             out.push(table("Thinnest coverage", ["Concept", "Langs"], a.thinnest.map((t) => [idCell(t.id, t.label), n(t.langs)]), [false, true]));

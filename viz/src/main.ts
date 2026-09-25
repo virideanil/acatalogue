@@ -29,6 +29,12 @@ import { effectiveTheme, readTheme, restoreTheme, toggleTheme, watchTheme } from
 const HIT_RADIUS = 24;
 /** Movement (px) under which a press counts as a click. */
 const CLICK_SLOP = 5;
+/** Search results larger than this get no glow impulse (the accent highlight remains). */
+const GLOW_MAX_HITS = 40;
+/** Typing pause before a search runs, ms (API and offline). */
+const SEARCH_DEBOUNCE_MS = { api: 200, offline: 120 };
+/** Reduced-motion pre-settle limits (whichever comes first, then the layout freezes). */
+const PRESETTLE = { maxSteps: 4000, maxMs: 5000 };
 
 type DragMode = "none" | "pan" | "particle" | "pinch";
 
@@ -68,6 +74,8 @@ class App {
   obstacles: Array<[number, number, number, number]> = [];
 
   private dirty = true;
+  /** Nothing is painted until the first layout is ready (pre-settled under reduced motion). */
+  private ready = false;
   private running = false;
   private lastTime = 0;
   private drawCount = 0;
@@ -151,6 +159,7 @@ class App {
       this.kick();
     });
     new ResizeObserver(() => this.onResize()).observe(this.field);
+    this.exposeDiagnostics();
     this.installInput();
     this.renderKey();
     this.onResize();
@@ -158,32 +167,41 @@ class App {
     if (this.reducedMotion) await this.presettle();
     this.fitTarget();
     this.camera.cut();
+    this.ready = true;
     this.kick();
-    this.exposeDiagnostics();
   }
 
   private describeSource(): void {
     const g = this.graph!;
     const sim = this.sim!;
-    const where =
-      g.source === "api" ? "live API (/api/graph)" : g.source === "static" ? "static file data/graph.json" : `?graph=${new URL(g.url).pathname}`;
+    let file = g.url;
+    try {
+      file = new URL(g.url, window.location.href).pathname.split("/").pop() || g.url;
+    } catch {
+      // keep the raw url
+    }
+    const where = g.source === "api" ? "live API" : g.source === "static" ? "static data/graph.json" : `${file} (?graph)`;
     const synthetic = g.payload.schemes.some((s) => /synthetic/i.test(s.title) || s.origin === "synthetic") ? " · SYNTHETIC test data" : "";
     const parts = [`${g.payload.nodes.length.toLocaleString("en")} concepts`, `${sim.m.toLocaleString("en")} links`, where + synthetic];
     if (!this.apiOnline) parts.push("API not reachable");
     const warn = [...g.warnings];
     if (sim.droppedEdges > 0) warn.push(`${sim.droppedEdges} edge(s) unusable by the physics`);
-    this.ui.setSource(parts.join(" · ") + (warn.length > 0 ? ` · warnings: ${warn.join("; ")}` : ""));
+    this.ui.setSource(parts.join(" · ") + (warn.length > 0 ? ` · warnings: ${warn.join("; ")}` : ""), `Loaded from ${g.url}${g.payload.generated_at ? `, generated ${g.payload.generated_at}` : ""}`);
   }
 
-  /** Reduced motion: run the simulation off-screen until it rests, then draw once. */
+  /**
+   * Reduced motion: run the simulation off-screen until it rests (or for at most
+   * PRESETTLE limits), then freeze it and draw once.
+   */
   private async presettle(): Promise<void> {
     const sim = this.sim!;
-    const maxSteps = 3000;
+    const t0 = performance.now();
     let done = 0;
+    const more = (): boolean => sim.awake && done < PRESETTLE.maxSteps && performance.now() - t0 < PRESETTLE.maxMs;
     this.ui.setFieldStatus("Settling the layout before drawing (reduced motion)…");
-    while (sim.awake && done < maxSteps) {
+    while (more()) {
       const t = performance.now();
-      while (sim.awake && done < maxSteps && performance.now() - t < 30) {
+      while (more() && performance.now() - t < 30) {
         sim.step();
         done++;
       }
@@ -212,7 +230,6 @@ class App {
             labels: app.renderer?.stats.labels ?? 0,
             rootLabelSize: app.renderer?.stats.rootLabelSize ?? 0,
             rootOverlaps: app.renderer?.stats.rootOverlaps ?? 0,
-            rootFailed: app.renderer?.stats.rootFailed ?? "",
             fps: app.perf.fps,
             frames: app.perf.frames,
             draws: app.perf.draws,
@@ -229,11 +246,6 @@ class App {
           if (i === undefined || !app.renderer) return null;
           return { x: app.renderer.sx[i]!, y: app.renderer.sy[i]! };
         },
-        /** Keep the simulation awake (performance measurement). */
-        wake(): void {
-          app.sim?.wake();
-          app.kick();
-        },
       }),
     });
   }
@@ -242,7 +254,7 @@ class App {
 
   kick(): void {
     this.dirty = true;
-    if (!this.running && this.sim) {
+    if (this.ready && !this.running && this.sim) {
       this.running = true;
       this.lastTime = 0;
       window.requestAnimationFrame(this.tick);
@@ -261,7 +273,8 @@ class App {
     if (res.clamped) this.perf.clamped++;
     if (this.autoFit && res.moved) this.fitTarget();
     const camMoved = cam.advance(dt);
-    if (res.moved || camMoved || sim.glowing > 0 || this.dirty) this.draw();
+    const glowChanged = sim.glowFading > 0;
+    if (res.moved || camMoved || glowChanged || this.dirty) this.draw();
     // fps over a rolling one-second window
     if (this.perf.windowStart === 0) this.perf.windowStart = now;
     this.perf.windowFrames++;
@@ -270,7 +283,7 @@ class App {
       this.perf.windowStart = now;
       this.perf.windowFrames = 0;
     }
-    const active = sim.awake || !cam.resting || sim.glowing > 0 || this.dirty || this.drag.mode !== "none";
+    const active = sim.awake || !cam.resting || glowChanged || this.dirty || this.drag.mode !== "none";
     if (active) window.requestAnimationFrame(this.tick);
     else {
       this.running = false;
@@ -522,11 +535,11 @@ class App {
       return;
     }
     if (!this.apiOnline) {
-      this.applyResults(localLabelSearch(this.graph!.payload.nodes, query));
+      this.searchTimer = window.setTimeout(() => this.applyResults(localLabelSearch(this.graph!.payload.nodes, query)), SEARCH_DEBOUNCE_MS.offline);
       return;
     }
     this.ui.showSearching(query);
-    this.searchTimer = window.setTimeout(() => void this.runGrep(query, mode, scope), 200);
+    this.searchTimer = window.setTimeout(() => void this.runGrep(query, mode, scope), SEARCH_DEBOUNCE_MS.api);
   }
 
   private async runGrep(q: string, mode: GrepMode, scope: GrepScope): Promise<void> {
@@ -560,6 +573,7 @@ class App {
 
   private setHits(order: number[] | null): void {
     const sim = this.sim!;
+    const previous = this.hits;
     if (order === null || order.length === 0) {
       this.hits = null;
       this.hitOrder = null;
@@ -568,7 +582,11 @@ class App {
       for (const i of order) hits[i] = 1;
       this.hits = hits;
       this.hitOrder = Int32Array.from(order);
-      if (!this.reducedMotion) for (const i of order) sim.excite(i, 1);
+      // Light up what just arrived; a broad match (every keystroke of a word) stays a
+      // static highlight instead of flashing the whole field.
+      if (!this.reducedMotion && order.length <= GLOW_MAX_HITS) {
+        for (const i of order) if (!previous || previous[i] !== 1) sim.excite(i, 1);
+      }
     }
     this.kick();
   }
@@ -710,6 +728,7 @@ class App {
       if (!d.moved && Math.hypot(p.x - d.startX, p.y - d.startY) > CLICK_SLOP) {
         d.moved = true;
         if (d.mode === "particle") {
+          this.autoFit = false;
           this.sim!.grab(d.index, this.camera.screenToWorldX(p.x), this.camera.screenToWorldY(p.y));
         } else {
           this.autoFit = false;

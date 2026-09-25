@@ -142,7 +142,7 @@ export async function loadGraph(location) {
             return got;
         throw new Error(`could not load ?graph=${override} (${attempts.join("; ")})`);
     }
-    const api = await tryUrl("/api/graph", "api");
+    const api = await tryUrl(new URL("/api/graph", location.href).href, "api");
     if (api)
         return api;
     const staticUrl = new URL("data/graph.json", location.href).href;

@@ -52,7 +52,7 @@ test("kinetic energy ends far below its early peak", (t) => {
   const last = ke[ke.length - 1];
   t.diagnostic(`early peak KE ${early.toFixed(1)}, final KE ${last.toFixed(4)}, ratio ${(last / early).toExponential(2)}, asleep: ${!sim.awake}`);
   assert.ok(early > 0);
-  assert.ok(last < early * 1e-3, `final ${last} vs early peak ${early}`);
+  assert.ok(last < early * 5e-3, `final ${last} vs early peak ${early}`);
 });
 
 test("spring-connected pairs sit closer than random unconnected pairs", (t) => {

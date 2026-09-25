@@ -54,9 +54,10 @@ export const PHYSICS = Object.freeze({
         outerClearance: 60,
         minRadius: 120,
         crossRootFactor: 0.2,
+        maxMutualRoots: 256,
     }),
     dragOmega: 24,
-    sleep: Object.freeze({ meanKE: 0.5, steps: 90 }),
+    sleep: Object.freeze({ meanKE: 1.0, steps: 90 }),
     glow: Object.freeze({ tau: 0.9, floor: 0.01 }),
 });
 const TAU = Math.PI * 2;
@@ -304,6 +305,8 @@ export class Sim {
     /** Per root slot: ring radius target and ring (0 inner, 1 outer). */
     ringRadius;
     ringOf;
+    /** Per ring (0 inner, 1 outer): whether its roots repel each other (see maxMutualRoots). */
+    mutualRing;
     /** Per root slot: charge in the root-root repulsion, proportional to its cluster's radius. */
     ringCharge;
     innerRadius;
@@ -341,6 +344,8 @@ export class Sim {
     glowing = 0;
     /** Running estimate of one dynamics step's wall time, ms (for the frame budget). */
     stepMs = 0;
+    /** Particles whose glow changed in the last glow step (held glows do not change). */
+    glowFading = 0;
     // Drag state.
     dragIndex = -1;
     dragX = 0;
@@ -475,6 +480,7 @@ export class Sim {
             : Math.max(innerRadius + maxInner + maxOuter + cfg.ring.outerClearance, ((1 + cfg.ring.gap) * sumOuter) / TAU);
         this.innerRadius = innerRadius;
         this.outerRadius = outerRadius;
+        this.mutualRing = [inner.length <= cfg.ring.maxMutualRoots, outer.length <= cfg.ring.maxMutualRoots];
         this.ringRadius = new Float64Array(roots.length);
         this.ringOf = new Uint8Array(roots.length);
         this.ringCharge = new Float64Array(roots.length);
@@ -736,6 +742,7 @@ export class Sim {
         this.energy.fill(0);
         this.glowHold.fill(0);
         this.glowing = 0;
+        this.glowFading = 0;
     }
     /** One fixed step of the dynamics (forces + semi-implicit Euler). Always integrates. */
     step() {
@@ -753,6 +760,8 @@ export class Sim {
         const rs2 = cfg.ring.rootSoftening * cfg.ring.rootSoftening;
         for (let a = 0; a < R; a++) {
             const i = roots[a];
+            if (!this.mutualRing[this.ringOf[a]])
+                continue;
             for (let b = a + 1; b < R; b++) {
                 if (this.ringOf[a] !== this.ringOf[b])
                     continue;
@@ -876,17 +885,24 @@ export class Sim {
     }
     /** Glow decay for one fixed step: E *= exp(-dt / tau) (exact for dE/dt = -E/tau). */
     stepGlow() {
+        this.glowFading = 0;
         if (this.glowing === 0)
             return;
         const decay = Math.exp(-this.cfg.dt / this.cfg.glow.tau);
         const floor = this.cfg.glow.floor;
         const E = this.energy;
         let active = 0;
+        let fading = 0;
         for (let i = 0; i < this.n; i++) {
             let e = E[i];
             if (e === 0)
                 continue;
-            e = this.glowHold[i] ? 1 : e * decay;
+            if (this.glowHold[i])
+                e = 1;
+            else {
+                e *= decay;
+                fading++;
+            }
             if (e < floor)
                 e = 0;
             else
@@ -894,6 +910,7 @@ export class Sim {
             E[i] = e;
         }
         this.glowing = active;
+        this.glowFading = fading;
     }
     /**
      * Feed one frame's wall time into the fixed-step accumulator and run the steps it
