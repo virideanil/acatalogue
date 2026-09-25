@@ -12,7 +12,7 @@ import urllib.parse
 
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
-from ..fetch import Fetcher
+from ..fetch import Fetcher, mediawiki_check
 from ..textkeys import nfc
 from ..util import today_compact, utcnow
 
@@ -32,9 +32,9 @@ def fetch_intros(titles: list[str], name: str | None = None) -> CorpusFile:
         batch = titles[start:start + 20]
         q = {"action": "query", "format": "json", "formatversion": "2", "prop": "extracts|info",
              "exintro": "1", "explaintext": "1", "exlimit": "20", "redirects": "1", "inprop": "url",
-             "titles": "|".join(batch)}
+             "maxlag": "5", "titles": "|".join(batch)}
         f.fetch(f"intros/batch-{n:03d}.json", f"{API}?{urllib.parse.urlencode(q)}", license=LICENSE,
-                attribution="Wikipedia contributors")
+                attribution="Wikipedia contributors", check=mediawiki_check)
     return corpus
 
 

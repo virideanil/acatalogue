@@ -11,11 +11,12 @@ from pathlib import Path
 
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
-from ..fetch import Fetcher
+from ..fetch import Fetcher, mediawiki_check, sparql_check
 from ..textkeys import nfc
 from ..util import REPO_ROOT, today_compact, utcnow
 
 API = "https://www.wikidata.org/w/api.php"
+MAXLAG = "5"      # Wikimedia asks automated clients to back off while replication lags
 SPARQL = "https://query.wikidata.org/sparql"
 LICENSE = "CC0 1.0 (Wikidata)"
 ATTRIBUTION = "Wikidata contributors"
@@ -62,7 +63,7 @@ def _norm(text: str) -> str:
 
 def _search_url(text: str) -> str:
     q = {"action": "wbsearchentities", "search": text, "language": "en", "uselang": "en",
-         "type": "item", "limit": "7", "format": "json"}
+         "type": "item", "limit": "7", "format": "json", "maxlag": MAXLAG}
     return f"{API}?{urllib.parse.urlencode(q)}"
 
 
@@ -75,10 +76,12 @@ def search(concepts: list[tuple[str, str, list[str]]], name: str | None = None) 
                         license=LICENSE, description="wbsearchentities responses, exact bytes, one item per query.")
     f = Fetcher(corpus, min_interval=0.5)
     for i, (code, label, alts) in enumerate(concepts, 1):
-        raw = f.fetch(f"search/{code}/label", _search_url(label), license=LICENSE, attribution=ATTRIBUTION)
+        raw = f.fetch(f"search/{code}/label", _search_url(label), license=LICENSE, attribution=ATTRIBUTION,
+                      check=mediawiki_check)
         hits = json.loads(raw).get("search", [])
         if alts and not any(_is_exact(h, label, alts) for h in hits):
-            f.fetch(f"search/{code}/alt", _search_url(alts[0]), license=LICENSE, attribution=ATTRIBUTION)
+            f.fetch(f"search/{code}/alt", _search_url(alts[0]), license=LICENSE, attribution=ATTRIBUTION,
+                    check=mediawiki_check)
         if i % 50 == 0:
             print(f"  searched {i}/{len(concepts)}", flush=True)
     return corpus
@@ -144,7 +147,8 @@ def reconcile_sparql(concepts: list[tuple[str, str, list[str]]], corpus: CorpusF
                  '  OPTIONAL { ?item schema:description ?desc FILTER(lang(?desc) = "en") }\n'
                  "}")
         f.fetch(f"sparql/labels-{n:03d}.json", SPARQL, data={"query": query, "format": "json"},
-                headers={"Accept": "application/sparql-results+json"}, license=LICENSE, attribution=ATTRIBUTION)
+                headers={"Accept": "application/sparql-results+json"}, license=LICENSE, attribution=ATTRIBUTION,
+                check=sparql_check)
 
 
 def propose_sparql(concepts: list[tuple[str, str, list[str]]], corpus: CorpusFile) -> list[dict]:
@@ -197,9 +201,9 @@ def fetch_entities(qids: list[str], name: str | None = None) -> CorpusFile:
     for n, start in enumerate(range(0, len(qids), 50), 1):
         batch = qids[start:start + 50]
         q = {"action": "wbgetentities", "ids": "|".join(batch), "props": "labels|descriptions|aliases|sitelinks",
-             "format": "json"}
+             "format": "json", "maxlag": MAXLAG}
         f.fetch(f"entities/batch-{n:03d}.json", f"{API}?{urllib.parse.urlencode(q)}",
-                license=LICENSE, attribution=ATTRIBUTION)
+                license=LICENSE, attribution=ATTRIBUTION, check=mediawiki_check)
     return corpus
 
 
@@ -219,7 +223,8 @@ def fetch_claims(qids: list[str], corpus: CorpusFile) -> None:
             '  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }\n'
             "}")
         f.fetch(f"sparql/claims-{n:03d}.json", SPARQL, data={"query": query, "format": "json"},
-                headers={"Accept": "application/sparql-results+json"}, license=LICENSE, attribution=ATTRIBUTION)
+                headers={"Accept": "application/sparql-results+json"}, license=LICENSE, attribution=ATTRIBUTION,
+                check=sparql_check)
 
 
 def _register_source(conn: sqlite3.Connection, corpus: CorpusFile, item_name: str) -> str:

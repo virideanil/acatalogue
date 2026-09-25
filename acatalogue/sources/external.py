@@ -14,7 +14,7 @@ import unicodedata
 
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
-from ..fetch import Fetcher
+from ..fetch import Fetcher, contains_check, mediawiki_check
 from ..util import today_compact, utcnow
 
 PAGES = {
@@ -30,6 +30,9 @@ PAGES = {
                   "&format=json&formatversion=2", "Wikipedia contributors, CC BY-SA 4.0"),
 }
 
+# what a real copy of each scraped page must contain (an error or interstitial page does not)
+PAGE_MARKERS = {"udc": (b"UDC Summary", b"MATHEMATICS"), "lcc": (b"Library of Congress", b"Class")}
+
 
 def fetch(name: str | None = None) -> CorpusFile:
     name = name or f"external-schemes-{today_compact()}"
@@ -39,7 +42,8 @@ def fetch(name: str | None = None) -> CorpusFile:
                         description="UDC Summary, LC Classification Outline, and Wikipedia pages for DDC and Propædia.")
     f = Fetcher(corpus, min_interval=1.0)
     for scheme, (item, url, lic) in PAGES.items():
-        f.fetch(item, url, license=lic, attribution=lic)
+        check = mediawiki_check if item.endswith(".json") else contains_check(*PAGE_MARKERS[scheme])
+        f.fetch(item, url, license=lic, attribution=lic, check=check)
     corpus.seal()
     return corpus
 
@@ -64,7 +68,7 @@ def verify(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "acat buil
         conn.execute(
             "INSERT INTO source(sha512, bytes, kind, name, corpus, uri, retrieved_at, content_type, license,"
             " attribution, first_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(sha512) DO NOTHING",
-            (digest, it["bytes"], "fetch", f"{corpus.name}:{item}", corpus.name, url, it["retrieved_at"],
+            (digest, it["bytes"], "fetch", f"{corpus.name}:{item}", corpus.name, it["url"] or url, it["retrieved_at"],
              it["content_type"], lic, lic, utcnow()))
         rows = conn.execute(
             "SELECT c.id, c.label, group_concat(l.text, '\x1f') FROM concept c"

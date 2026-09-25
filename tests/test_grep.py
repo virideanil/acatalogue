@@ -205,17 +205,20 @@ class CatalogueTests(unittest.TestCase):
         t.start()
         base = f"http://127.0.0.1:{httpd.server_address[1]}"
         try:
-            g = json.load(urllib.request.urlopen(base + "/api/graph"))
+            with urllib.request.urlopen(base + "/api/graph") as r:
+                g = json.load(r)
             self.assertGreater(len(g["nodes"]), 900)
             for e in g["edges"][:200]:
                 self.assertIn(e["k"], {"broader", "related", "mapping", "semantic"})
-            n = json.load(urllib.request.urlopen(base + "/api/node?id=acat/physics"))
+            with urllib.request.urlopen(base + "/api/node?id=acat/physics") as r:
+                n = json.load(r)
             self.assertEqual(n["id"], "acat/physics")
             with self.assertRaises(urllib.error.HTTPError) as err:
                 urllib.request.urlopen(base + "/api/grep?q=(bad&mode=regex")
             self.assertEqual(err.exception.code, 400)
         finally:
             httpd.shutdown()
+            httpd.server_close()
 
 
 if __name__ == "__main__":

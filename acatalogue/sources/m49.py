@@ -5,7 +5,7 @@ import sqlite3
 
 from .. import ledger
 from ..corpusfile import CorpusFile, corpus_path
-from ..fetch import Fetcher
+from ..fetch import Fetcher, contains_check
 from ..textkeys import nfc
 from ..util import today_compact, utcnow
 from .htmltables import tables
@@ -27,7 +27,8 @@ def fetch(name: str | None = None) -> CorpusFile:
                         title="UN M49 standard country or area codes (all six UN languages)",
                         license=LICENSE,
                         description="The UNSD M49 overview page as served, exact bytes.")
-    Fetcher(corpus).fetch(ITEM, URL, license=LICENSE, attribution=ATTRIBUTION)
+    Fetcher(corpus).fetch(ITEM, URL, license=LICENSE, attribution=ATTRIBUTION,
+                          check=contains_check(*(t.encode() for t in TABLE_LANGS)))
     corpus.seal()
     return corpus
 
