@@ -265,8 +265,10 @@ out test: for each of 28 languages chosen across scripts and regions (Spanish, G
 Vietnamese, Indonesian, Russian, Kazakh, Greek, Armenian, Georgian, Arabic, Persian, Urdu, Hebrew,
 Hindi, Bengali, Tamil, Chinese, Japanese, Korean, Thai, Burmese, Swahili, Hausa, Yoruba, Amharic,
 Quechua, Māori), every ACAT concept's preferred label in that language becomes a query whose one
-right answer is the concept, and every label in that language is hidden from the index while it
-runs. A system has to find the concept through the other languages' names — the situation of a
+right answer is the concept, and every label in that language — and in its variants (Chinese hides
+zh-hans, zh-tw …; German hides de-ch; Kazakh hides kk-cyrl …) — is left out of the index while it
+runs: the lexical indexes are rebuilt without them, so they take no candidate slot and count in no
+statistic. A system has to find the concept through the other languages' names — the situation of a
 reader whose language the catalogue covers thinly. English is left out: the catalogue is written
 in it. Every query and every rank is stored (`eval_*` tables); intervals are stratified bootstrap
 percentiles, comparisons paired randomization tests.
@@ -279,7 +281,38 @@ find their vectors again and no vector can drift onto another label); and recipr
 (k = 60). All but LSA search the same index: the
 preferred and alternative labels of the ACAT concepts.
 
-*Results: the full run is computing; its numbers replace this paragraph in the next commit.*
+Results (run 2, 11,486 queries; macro MRR@10 over the 28 languages, 95% intervals):
+
+| System | MRR@10 | Recall@10 | Worst language |
+|---|---|---|---|
+| dense (multilingual-e5-large-instruct) | **0.775** [0.768, 0.783] | 0.862 | Māori 0.130 |
+| fusion of words, trigrams and dense | 0.585 [0.577, 0.593] | 0.755 | Māori 0.093 |
+| character trigrams | 0.388 [0.381, 0.395] | 0.445 | Korean 0.012 |
+| fusion of words and trigrams | 0.381 [0.373, 0.388] | 0.448 | Korean 0.012 |
+| FTS5 words | 0.277 [0.269, 0.283] | 0.310 | Korean 0.006 |
+| LSA (English text) | 0.016 [0.013, 0.018] | 0.021 | Amharic 0.000 |
+
+What it says:
+
+- **The dense model is the semantic layer this catalogue lacked.** It beats words by +0.499 and
+  the best lexical system by +0.395 (p < 0.001, paired randomization). The gap is widest where names
+  share no letters across scripts: Greek 0.886 against 0.071 with trigrams, Korean 0.849 against
+  0.012, Thai 0.856 against 0.018.
+- **Plain rank fusion hurts.** Fusing the dense ranking with the weak lexical rankings loses 0.190
+  against dense alone (p < 0.001). Equal-weight fusion is not a default to adopt blindly.
+- **The model is itself a bias, now measured.** Its six worst languages are Māori 0.130, Quechua
+  0.167, Yoruba 0.398, Hausa 0.466, Amharic 0.570 and Swahili 0.628, against 0.97–0.99 for Spanish,
+  Russian, German and Chinese. Speakers of the languages with the least training text are served
+  worst, so the catalogue will not call the dense layer neutral.
+- **LSA is not a cross-language system.** It is fit on English text and scores 0.016; it stays as a
+  labelled baseline.
+- **The leak that was fixed.** Run 1 hid only the exact language tag. Chinese queries then found
+  their own string under zh-hans in 400 of 536 cases, and words scored 0.866 for Chinese instead of
+  0.670. Run 1 stays stored, marked by run 2's parameters; the dense model moved by 0.010 at most,
+  because it finds concepts through the other languages anyway.
+
+Adopting dense search in the grepper, alone or with weighted fusion, is a decision for the
+catalogue's owner. These numbers are its evidence.
 
 ## 7. The particle field
 

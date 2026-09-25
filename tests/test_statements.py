@@ -244,6 +244,7 @@ class ImportTests(unittest.TestCase):
     def test_reimport_is_idempotent(self):
         again = wikidata.import_statements(self.conn, self.statements)
         self.assertEqual(again["new"], 0)
+        self.assertEqual(again["retimed"], 0)
         self.assertEqual(self.conn.execute("SELECT count(*) FROM claim_qualifier").fetchone()[0], 3)
         self.assertEqual(self.conn.execute("SELECT count(*) FROM claim_reference").fetchone()[0], 2)
 
@@ -267,6 +268,24 @@ class ImportTests(unittest.TestCase):
         rows = dict(conn.execute("SELECT subject, superseded_at FROM claim WHERE statement_id IS NULL"))
         self.assertIsNone(rows["wd/Q1"], "Q1 was read before this summary was recorded")
         self.assertEqual(rows["wd/Q3"], "2026-02-01T00:00:00Z")
+        # a database written by the earlier rule (every summary dated by the last batch) is corrected
+        conn.execute("UPDATE claim SET superseded_at = '2026-02-01T00:00:00Z' WHERE subject = 'wd/Q1'"
+                     " AND statement_id IS NULL")
+        again = wikidata.import_statements(conn, c)
+        self.assertEqual(again["resuperseded"], 1)
+        self.assertIsNone(conn.execute("SELECT superseded_at FROM claim WHERE subject = 'wd/Q1'"
+                                       " AND statement_id IS NULL").fetchone()[0])
+        self.assertEqual(conn.execute("SELECT count(*) FROM ledger WHERE action = 'retime-claims'").fetchone()[0], 1)
+
+    def test_a_corrected_reading_of_time_reaches_stored_claims(self):
+        """A claim stored under an earlier (wrong) reading of its qualifiers is re-read, and the change ledgered."""
+        right = self.claim("Q1$AAA")["valid_from_day"]
+        self.conn.execute("UPDATE claim SET valid_from_day = ? WHERE statement_id = 'Q1$AAA'", (right - 9,))
+        again = wikidata.import_statements(self.conn, self.statements)
+        self.assertEqual(again["retimed"], 1)
+        self.assertEqual(self.claim("Q1$AAA")["valid_from_day"], right)
+        detail = self.conn.execute("SELECT detail FROM ledger WHERE action = 'retime-claims'").fetchone()[0]
+        self.assertIn(str(right - 9), detail, "the old value is kept in the ledger")
 
     def test_a_later_summary_is_not_superseded_by_older_statements(self):
         later = summary_corpus(self.tmp, "wikidata-entities-20260301", [("Q1", "P361", "Q9")], "2026-03-01T00:00:00Z")

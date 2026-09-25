@@ -665,7 +665,8 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
     corpora) are superseded, never deleted."""
     _ensure_scheme(conn)
     stats = {"entities": 0, "missing": 0, "claims": 0, "new": 0, "qualifiers": 0, "references": 0,
-             "labelled": 0, "with_time": 0}
+             "labelled": 0, "with_time": 0, "retimed": 0}
+    retimed: list[dict] = []                   # derived world-time read anew from the same bytes
     for it in corpus.items():                   # display labels for the items and properties claims name
         if not it["name"].startswith("labels/"):
             continue
@@ -711,6 +712,18 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
                          valid_from, valid_to, precision, from_day, to_day, digest, recorded))
                     stats["claims"] += 1
                     if not cur.rowcount:                         # already imported from these bytes
+                        # the world-time columns are this code's reading of the qualifiers; when the
+                        # reading has been corrected, the stored claim follows it (old values ledgered)
+                        row = conn.execute(
+                            "SELECT id, valid_from, valid_to, time_precision, valid_from_day, valid_to_day FROM claim"
+                            " WHERE statement_id = ? AND source_sha512 = ?", (st["id"], digest)).fetchone()
+                        now_read = (valid_from, valid_to, precision, from_day, to_day)
+                        if row is not None and tuple(row[1:]) != now_read:
+                            conn.execute("UPDATE claim SET valid_from = ?, valid_to = ?, time_precision = ?,"
+                                         " valid_from_day = ?, valid_to_day = ? WHERE id = ?", (*now_read, row[0]))
+                            stats["retimed"] += 1
+                            retimed.append({"claim": row[0], "statement": st["id"], "was": list(row[1:]),
+                                            "now": list(now_read)})
                         continue
                     stats["new"] += 1
                     stats["with_time"] += valid_from is not None or valid_to is not None
@@ -739,6 +752,25 @@ def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str =
         " AND EXISTS (SELECT 1 FROM _covered c WHERE c.id = claim.subject AND c.at >= claim.recorded_at)"
         " AND source_sha512 IN (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%'"
         " AND name LIKE '%:sparql/claims-%')").rowcount
+    # supersessions an earlier reading dated by the corpus's last batch instead of the batch that read
+    # the entity: moved to the right time (or undone, when no batch read it after the summary)
+    last = corpus_time(corpus, "entities/")
+    moved = conn.execute(
+        "SELECT id, superseded_at, (SELECT min(c.at) FROM _covered c WHERE c.id = claim.subject"
+        " AND c.at >= claim.recorded_at) FROM claim WHERE superseded_at = ? AND statement_id IS NULL"
+        " AND subject IN (SELECT id FROM _covered) AND source_sha512 IN (SELECT sha512 FROM source"
+        " WHERE corpus LIKE 'wikidata-entities-%' AND name LIKE '%:sparql/claims-%')", (last,)).fetchall()
+    moved = [(cid, was, at) for cid, was, at in moved if at != was]
+    conn.executemany("UPDATE claim SET superseded_at = ? WHERE id = ?", [(at, cid) for cid, _, at in moved])
+    stats["resuperseded"] = len(moved)
+    if retimed or moved:
+        ledger.record(conn, actor, "retime-claims", target=f"doc/{corpus.name}",
+                      detail={"world_time": len(retimed), "record_time": len(moved),
+                              "world_time_changes": retimed[:200],
+                              "record_time_changes": [{"claim": c, "was": w, "now": a} for c, w, a in moved[:200]]},
+                      receipt=f"manifest:{corpus.manifest()}",
+                      undo="the previous values are listed here (the first 200 of each); the qualifiers they "
+                           "were read from are unchanged in claim_qualifier")
     stats["superseded_statements"] = conn.execute(
         "UPDATE claim SET superseded_at = (SELECT min(c.at) FROM _covered c WHERE c.id = claim.subject)"
         " WHERE superseded_at IS NULL AND subject IN (SELECT id FROM _covered) AND source_sha512 IN"
