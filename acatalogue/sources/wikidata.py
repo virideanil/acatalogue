@@ -227,6 +227,80 @@ def fetch_claims(qids: list[str], corpus: CorpusFile) -> None:
                 check=sparql_check)
 
 
+# ─── statements (entity JSON) ───────────────────────────────────────────────
+
+
+def _entity_key(eid: str) -> tuple[str, int]:
+    return eid[0], int(eid[1:])
+
+
+def referenced_entities(payload: dict) -> set[str]:
+    """Every item and property a wbgetentities payload names: predicates, and the item/property values of
+    main snaks, qualifiers and references. (Lexemes and entity schemas cannot be fetched with it.)"""
+    out: set[str] = set()
+
+    def snak(s: dict) -> None:
+        out.add(s["property"])
+        dv = s.get("datavalue") if s.get("snaktype") == "value" else None
+        if dv and dv.get("type") == "wikibase-entityid":
+            eid = _entity_id(dv["value"])
+            if re.fullmatch(r"[QP]\d+", eid):
+                out.add(eid)
+
+    for ent in payload.get("entities", {}).values():
+        for statements in ent.get("claims", {}).values():
+            for st in statements:
+                snak(st["mainsnak"])
+                for snaks in st.get("qualifiers", {}).values():
+                    for s in snaks:
+                        snak(s)
+                for ref in st.get("references", []):
+                    for snaks in ref.get("snaks", {}).values():
+                        for s in snaks:
+                            snak(s)
+    return out
+
+
+def fetch_statements(qids: list[str], name: str | None = None) -> CorpusFile:
+    """Entity JSON for the reconciled items: every statement with its id, rank, qualifiers and references,
+    and the entity's revision id. Then the English and multilingual ('mul') labels of every item and
+    property those statements name, so claims can be read without another lookup. Resumable."""
+    name = name or f"wikidata-statements-{today_compact()}"
+    corpus = CorpusFile(corpus_path(name), create=True, name=name,
+                        title="Wikidata statements of reconciled concepts, with qualifiers, references and revisions",
+                        license=LICENSE,
+                        description="wbgetentities props=claims|info in batches of 50 (entities/), then labels in en "
+                                    "and mul for every item and property they reference (labels/). Exact bytes.")
+    f = Fetcher(corpus, min_interval=1.5)
+    qids = sorted(set(qids), key=_entity_key)
+    for n, start in enumerate(range(0, len(qids), 50), 1):
+        q = {"action": "wbgetentities", "ids": "|".join(qids[start:start + 50]), "props": "claims|info",
+             "format": "json", "maxlag": MAXLAG}
+        f.fetch(f"entities/batch-{n:03d}.json", f"{API}?{urllib.parse.urlencode(q)}",
+                license=LICENSE, attribution=ATTRIBUTION, check=mediawiki_check)
+    named: set[str] = set()
+    for it in corpus.items():
+        if it["name"].startswith("entities/"):
+            named |= referenced_entities(json.loads(corpus.get(it["name"])))
+    todo = sorted(named, key=_entity_key)
+    print(f"  {len(qids)} entities fetched; {len(todo)} referenced items and properties to label", flush=True)
+    for n, start in enumerate(range(0, len(todo), 50), 1):
+        q = {"action": "wbgetentities", "ids": "|".join(todo[start:start + 50]), "props": "labels",
+             "languages": "en|mul", "format": "json", "maxlag": MAXLAG}
+        f.fetch(f"labels/batch-{n:04d}.json", f"{API}?{urllib.parse.urlencode(q)}",
+                license=LICENSE, attribution=ATTRIBUTION, check=mediawiki_check)
+        if n % 25 == 0:
+            print(f"  labels {min(start + 50, len(todo))}/{len(todo)}", flush=True)
+    return corpus
+
+
+def _entity_id(v: dict) -> str:
+    if v.get("id"):
+        return v["id"]
+    prefix = {"item": "Q", "property": "P", "lexeme": "L"}.get(v.get("entity-type", "item"), "Q")
+    return f"{prefix}{v['numeric-id']}"
+
+
 def _register_source(conn: sqlite3.Connection, corpus: CorpusFile, item_name: str) -> str:
     it = corpus.item(item_name)
     conn.execute(
@@ -338,9 +412,18 @@ def import_decisions(conn: sqlite3.Connection, decisions: list[dict], seed_sha51
     return n
 
 
+def corpus_time(corpus: CorpusFile, prefix: str = "") -> str:
+    """When the catalogue learned what a corpus says: the last retrieval among its items (named with
+    `prefix`). Record time comes from the bytes, so rebuilding the database does not move it."""
+    times = [it["retrieved_at"] for it in corpus.items() if it["name"].startswith(prefix)]
+    return max(times) if times else (corpus.meta().get("sealed_at") or utcnow())
+
+
 def import_claims(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "acat build") -> dict:
+    """Claims read from WDQS result tables (subject, property, value, rank): the summary form, without
+    statement ids, qualifiers or references. `import_statements` supersedes them where it has the entity."""
     stats = {"claims": 0, "new": 0}
-    now = utcnow()
+    now = corpus_time(corpus, "sparql/claims-")
     _ensure_scheme(conn)
     for pid, label in CLAIM_PROPERTIES.items():
         conn.execute("INSERT INTO concept(id, scheme, code, label) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING",
@@ -349,6 +432,7 @@ def import_claims(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "ac
         if not it["name"].startswith("sparql/"):
             continue
         digest = _register_source(conn, corpus, it["name"])
+        recorded = it["retrieved_at"]
         data = json.loads(corpus.get(it["name"]))
         for b in data["results"]["bindings"]:
             subj = b["item"]["value"].rsplit("/", 1)[-1]
@@ -364,16 +448,181 @@ def import_claims(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "ac
             cur = conn.execute(
                 "INSERT OR IGNORE INTO claim(subject, predicate, object, rank, epistemic, source_sha512, recorded_at)"
                 " VALUES (?,?,?,?,?,?,?)",
-                (f"wd/{subj}", f"wd/{b['pid']['value']}", f"wd/{obj}", rank, "epistemic/attributed", digest, now))
+                (f"wd/{subj}", f"wd/{b['pid']['value']}", f"wd/{obj}", rank, "epistemic/attributed", digest,
+                 recorded))
             stats["claims"] += 1
             stats["new"] += cur.rowcount
     # record time moves on: claims read from an older Wikidata corpus are superseded by this one
     # (kept, never deleted; the new corpus restates whatever is still true)
     cur = conn.execute(
         "UPDATE claim SET superseded_at = ? WHERE superseded_at IS NULL AND source_sha512 IN"
-        " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%' AND corpus <> ?)", (now, corpus.name))
+        " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%' AND corpus < ?)", (now, corpus.name))
     stats["superseded"] = cur.rowcount
     ledger.record(conn, actor, "import-wikidata-claims", target=f"doc/{corpus.name}", detail=stats,
                   receipt=f"manifest:{corpus.manifest()}",
                   undo="claims are never deleted; a later corpus supersedes them")
+    return stats
+
+
+# ─── statements: values, times, import ──────────────────────────────────────
+
+_TIME = re.compile(r"([+-])(\d+)-(\d\d)-(\d\d)T")
+JULIAN = "http://www.wikidata.org/entity/Q1985786"
+
+
+def _julian_to_gregorian(year: int, month: int, day: int) -> tuple[int, int, int]:
+    """Julian calendar date -> proleptic Gregorian, both with astronomical years (via the Julian day number)."""
+    a = (14 - month) // 12
+    y, m = year + 4800 - a, month + 12 * a - 3
+    jdn = day + (153 * m + 2) // 5 + 365 * y + y // 4 - 32083
+    a = jdn + 32044
+    b = (4 * a + 3) // 146097
+    c = a - 146097 * b // 4
+    d = (4 * c + 3) // 1461
+    e = c - 1461 * d // 4
+    m = (5 * e + 2) // 153
+    return 100 * b + d - 4800 + m // 10, m + 3 - 12 * (m // 10), e - (153 * m + 2) // 5 + 1
+
+
+def wd_time(v: dict) -> tuple[str, int] | None:
+    """A Wikidata time value as ISO 8601 / EDTF text: proleptic Gregorian calendar, astronomical years
+    (1 BCE = 0000), cut to the value's precision. Returns (text, precision of the text).
+
+    The JSON counts 1 BCE as -0001, so negative years shift by one. Day-precision Julian dates are
+    converted; a Julian month cannot be named in the Gregorian calendar, so it is cut to its year.
+    Precisions coarser than a year (decade 8, century 7, ...) keep Wikidata's year and code."""
+    m = _TIME.match(v.get("time", ""))
+    if not m:
+        return None
+    sign, y, mo, d = m.groups()
+    year, month, day = int(y), int(mo), int(d)
+    if sign == "-":
+        year = 1 - year
+    prec = int(v.get("precision", 9))
+    julian = v.get("calendarmodel") == JULIAN
+    if prec >= 11 and month and day and not (julian and year < -4700):
+        if julian:
+            year, month, day = _julian_to_gregorian(year, month, day)
+        prec, text = 11, f"-{month:02d}-{day:02d}"
+    elif prec >= 10 and month and not julian:
+        prec, text = 10, f"-{month:02d}"
+    else:
+        prec, text = min(prec, 9), ""
+    return (f"{year:04d}" if year >= 0 else f"-{-year:04d}") + text, prec
+
+
+def snak_parts(s: dict) -> tuple[str, str | None, str | None, str | None]:
+    """(snak type, object id, literal value, datatype) of one snak. Things become scoped ids; strings are
+    kept exactly; structured values (time, quantity, monolingual text, coordinates) as canonical JSON."""
+    kind, dt = s["snaktype"], s.get("datatype")
+    if kind != "value":
+        return kind, None, None, dt
+    dv = s["datavalue"]
+    if dv["type"] == "wikibase-entityid":
+        return kind, f"wd/{_entity_id(dv['value'])}", None, dt
+    if dv["type"] == "string":
+        return kind, None, dv["value"], dt
+    return kind, None, json.dumps(dv["value"], ensure_ascii=False, sort_keys=True, separators=(",", ":")), dt
+
+
+def validity(qualifiers: dict) -> tuple[str | None, str | None, int | None]:
+    """World time of a statement from its start time (P580), end time (P582) or point in time (P585)
+    qualifiers, only when each is a single known value. Everything else stays in claim_qualifier."""
+    def one(pid: str) -> tuple[str, int] | None:
+        snaks = qualifiers.get(pid, [])
+        if len(snaks) != 1 or snaks[0]["snaktype"] != "value" or snaks[0]["datavalue"]["type"] != "time":
+            return None
+        return wd_time(snaks[0]["datavalue"]["value"])
+    start, end, point = one("P580"), one("P582"), one("P585")
+    if point and not (start or end):
+        start = end = point
+    precisions = [t[1] for t in (start, end) if t]
+    return (start[0] if start else None, end[0] if end else None, min(precisions) if precisions else None)
+
+
+def _pointer(*parts: str | int) -> str:
+    """RFC 6901 JSON Pointer."""
+    return "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in parts)
+
+
+def import_statements(conn: sqlite3.Connection, corpus: CorpusFile, actor: str = "acat build") -> dict:
+    """Every statement of the fetched entities, one claim each: statement id, rank, snak type, the
+    entity revision it was read from and a JSON Pointer to it in the stored bytes; qualifiers and
+    references as rows. Claims read earlier for the same entities (WDQS summaries, older statement
+    corpora) are superseded, never deleted."""
+    _ensure_scheme(conn)
+    stats = {"entities": 0, "missing": 0, "claims": 0, "new": 0, "qualifiers": 0, "references": 0,
+             "labelled": 0, "with_time": 0}
+    for it in corpus.items():                   # display labels for the items and properties claims name
+        if not it["name"].startswith("labels/"):
+            continue
+        digest = _register_source(conn, corpus, it["name"])
+        for eid, ent in json.loads(corpus.get(it["name"])).get("entities", {}).items():
+            labels = ent.get("labels", {})
+            text = (labels.get("en") or labels.get("mul") or {}).get("value")
+            if "missing" not in ent and text:
+                cur = conn.execute("INSERT INTO concept(id, scheme, code, label, source_sha512) VALUES (?,?,?,?,?)"
+                                   " ON CONFLICT(id) DO NOTHING", (f"wd/{eid}", "wd", eid, nfc(text), digest))
+                stats["labelled"] += cur.rowcount
+    covered: set[str] = set()
+    for it in corpus.items():
+        if not it["name"].startswith("entities/"):
+            continue
+        digest = _register_source(conn, corpus, it["name"])
+        recorded = it["retrieved_at"]
+        for qid, ent in json.loads(corpus.get(it["name"])).get("entities", {}).items():
+            if "missing" in ent:
+                stats["missing"] += 1
+                continue
+            stats["entities"] += 1
+            covered.add(f"wd/{qid}")
+            for pid, statements in ent.get("claims", {}).items():
+                for i, st in enumerate(statements):
+                    kind, obj, value, dt = snak_parts(st["mainsnak"])
+                    valid_from, valid_to, precision = validity(st.get("qualifiers", {}))
+                    cur = conn.execute(
+                        "INSERT OR IGNORE INTO claim(subject, predicate, snak_type, object, value, datatype, rank,"
+                        " statement_id, source_revision, source_pointer, epistemic, valid_from, valid_to,"
+                        " time_precision, source_sha512, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (f"wd/{qid}", f"wd/{pid}", kind, obj, value, dt, st.get("rank"), st["id"],
+                         ent.get("lastrevid"), _pointer("entities", qid, "claims", pid, i), "epistemic/attributed",
+                         valid_from, valid_to, precision, digest, recorded))
+                    stats["claims"] += 1
+                    if not cur.rowcount:                         # already imported from these bytes
+                        continue
+                    stats["new"] += 1
+                    stats["with_time"] += valid_from is not None or valid_to is not None
+                    claim_id = cur.lastrowid
+                    rows = [(claim_id, n, f"wd/{s['property']}", *snak_parts(s)) for n, s in enumerate(
+                        s for p in st.get("qualifiers-order", st.get("qualifiers", {}))
+                        for s in st.get("qualifiers", {}).get(p, []))]
+                    conn.executemany("INSERT OR IGNORE INTO claim_qualifier(claim_id, ord, property, snak_type,"
+                                     " object, value, datatype) VALUES (?,?,?,?,?,?,?)", rows)
+                    stats["qualifiers"] += len(rows)
+                    for ref in st.get("references", []):
+                        rows = [(claim_id, ref["hash"], n, f"wd/{s['property']}", *snak_parts(s)) for n, s in
+                                enumerate(s for p in ref.get("snaks-order", ref.get("snaks", {}))
+                                          for s in ref["snaks"].get(p, []))]
+                        conn.executemany("INSERT OR IGNORE INTO claim_reference(claim_id, ref_hash, ord, property,"
+                                         " snak_type, object, value, datatype) VALUES (?,?,?,?,?,?,?,?)", rows)
+                        stats["references"] += 1
+    # record time moves on for the covered entities: their WDQS summaries and any older statement corpus
+    # are superseded as of this corpus (a summary retrieved later than this corpus is left current)
+    now = corpus_time(corpus, "entities/")
+    conn.execute("CREATE TEMP TABLE IF NOT EXISTS _covered(id TEXT PRIMARY KEY)")
+    conn.execute("DELETE FROM _covered")
+    conn.executemany("INSERT INTO _covered(id) VALUES (?)", [(c,) for c in sorted(covered)])
+    stats["superseded_summaries"] = conn.execute(
+        "UPDATE claim SET superseded_at = ? WHERE superseded_at IS NULL AND statement_id IS NULL"
+        " AND recorded_at <= ? AND subject IN (SELECT id FROM _covered) AND source_sha512 IN"
+        " (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-entities-%' AND name LIKE '%:sparql/claims-%')",
+        (now, now)).rowcount
+    stats["superseded_statements"] = conn.execute(
+        "UPDATE claim SET superseded_at = ? WHERE superseded_at IS NULL AND subject IN (SELECT id FROM _covered)"
+        " AND source_sha512 IN (SELECT sha512 FROM source WHERE corpus LIKE 'wikidata-statements-%' AND corpus < ?)",
+        (now, corpus.name)).rowcount
+    ledger.record(conn, actor, "import-wikidata-statements", target=f"doc/{corpus.name}", detail=stats,
+                  receipt=f"manifest:{corpus.manifest()}",
+                  undo="claims are never deleted; superseded rows keep their text and source, and a later "
+                       "corpus supersedes these in turn")
     return stats

@@ -27,9 +27,12 @@ def latest_corpus(family: str) -> CorpusFile | None:
         m = re.fullmatch(rf"{re.escape(family)}-(\d{{8}})", p.parent.name)
         if m:
             found.append((m.group(1), p))
-    if not found:
-        return None
-    return CorpusFile(sorted(found)[-1][1], readonly=True)
+    for _, p in sorted(found, reverse=True):
+        c = CorpusFile(p, readonly=True)
+        if c.sealed:                     # a corpus still being fetched never feeds a build
+            return c
+        c.close()
+    return None
 
 
 def register_corpus(conn: sqlite3.Connection, corpus: CorpusFile) -> None:
@@ -140,7 +143,11 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
 
         for p in sorted(CORPORA_DIR.glob("*/corpus.sqlite")):
             c = CorpusFile(p, readonly=True)
-            register_corpus(conn, c)
+            if c.sealed:
+                register_corpus(conn, c)
+            else:
+                report.setdefault("unsealed_skipped", []).append(c.name)
+                say(f"skipped {c.name}: not sealed (a fetch is still running or was interrupted)")
             c.close()
 
         if (c := latest_corpus("un-m49")) is not None:
@@ -160,6 +167,9 @@ def build(db_path: str | Path = DEFAULT_DB, *, verbose: bool = True) -> dict:
                 report["wikidata"] = wikidata.import_entities(conn, c, decisions, ACTOR)
                 report["claims"] = wikidata.import_claims(conn, c, ACTOR)
                 say(f"wikidata ({c.name}): {report['wikidata']} claims: {report['claims']}")
+            if (c := latest_corpus("wikidata-statements")) is not None:
+                report["statements"] = wikidata.import_statements(conn, c, ACTOR)
+                say(f"wikidata statements ({c.name}): {report['statements']}")
             report["wikidata_mappings"] = wikidata.import_decisions(conn, decisions, sf.sha512)
 
         if (c := latest_corpus("wikipedia-en-intros")) is not None:

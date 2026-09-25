@@ -21,7 +21,8 @@ from typing import Callable
 from .corpusfile import CorpusFile
 from .util import utcnow
 
-USER_AGENT = "acatalogue/0.2 (+https://github.com/virideanil/acatalogue; knowledge catalogue builder)"
+# Wikimedia User-Agent policy format: <client>/<version> (<contact>) <library>/<version>
+USER_AGENT = f"acatalogue/0.2 (https://github.com/virideanil/acatalogue) Python-urllib/{urllib.request.__version__}"
 
 # (verdict, seconds to wait, message): verdict is 'ok', 'retry' or 'fail'
 Check = Callable[[bytes], tuple[str, float | None, str | None]]
@@ -67,12 +68,17 @@ def sparql_check(raw: bytes) -> tuple[str, float | None, str | None]:
 
 
 class Fetcher:
+    """`max_retries` bounds attempts after errors (5xx other than 503, network failures). Signals that
+    the server is busy (429, 503, maxlag, rate limits) are waited out with exponential backoff, honouring
+    Retry-After and the reported lag, for up to `patience` seconds in total per item."""
+
     def __init__(self, corpus: CorpusFile, *, min_interval: float = 1.0, max_retries: int = 6,
-                 max_wait: float = 120.0, timeout: float = 60.0, verbose: bool = True):
+                 max_wait: float = 120.0, patience: float = 900.0, timeout: float = 60.0, verbose: bool = True):
         self.corpus = corpus
         self.min_interval = min_interval
         self.max_retries = max_retries
         self.max_wait = max_wait
+        self.patience = patience
         self.timeout = timeout
         self.verbose = verbose
         self._last = 0.0
@@ -87,12 +93,6 @@ class Fetcher:
             time.sleep(wait)
         self._last = time.monotonic()
 
-    def _wait(self, item_name: str, seconds: float, why: str, attempt: int) -> None:
-        if seconds > self.max_wait:
-            raise FetchError(f"{item_name}: asked to wait {seconds:.0f}s (> {self.max_wait:.0f}s): {why}")
-        self._say(f"  {why} on {item_name}; waiting {seconds:.0f}s (attempt {attempt})")
-        time.sleep(seconds)
-
     def fetch(self, item_name: str, url: str, *, data: dict | None = None, headers: dict | None = None,
               license: str | None = None, attribution: str | None = None, check: Check | None = None) -> bytes:
         if self.corpus.has(item_name):
@@ -102,8 +102,27 @@ class Fetcher:
         if headers:
             hdrs.update(headers)
         method = "POST" if body is not None else "GET"
-        delay = 2.0
-        for attempt in range(1, self.max_retries + 1):
+        backoff, waited, errors, attempt = 2.0, 0.0, 0, 0
+
+        def wait(seconds: float, why: str, busy: bool) -> None:
+            """Sleep before the next attempt, or raise when the budget for this kind of trouble is spent."""
+            nonlocal backoff, waited, errors
+            if busy:
+                seconds = min(max(seconds, backoff), self.max_wait)
+                if waited + seconds > self.patience:
+                    raise FetchError(f"{url}: still busy after waiting {waited:.0f}s: {why}")
+            else:
+                errors += 1
+                if errors >= self.max_retries:
+                    raise FetchError(f"{url}: gave up after {errors} failed attempts: {why}")
+                seconds = min(max(seconds, backoff), self.max_wait)
+            self._say(f"  {why} on {item_name}; waiting {seconds:.0f}s (attempt {attempt})")
+            time.sleep(seconds)
+            waited += seconds
+            backoff = min(backoff * 2, self.max_wait)
+
+        while True:
+            attempt += 1
             self._pace()
             req = urllib.request.Request(url, data=body, headers=hdrs, method=method)
             retrieved_at = utcnow()
@@ -120,28 +139,23 @@ class Fetcher:
                 status = exc.code
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
                 self.corpus.log(url, status, note=f"attempt {attempt}; retry-after={retry_after}")
-                if status in (429, 500, 502, 503, 504) and attempt < self.max_retries:
-                    wait = max(delay, float(retry_after)) if retry_after and retry_after.isdigit() else delay
-                    self._wait(item_name, wait, f"HTTP {status}", attempt)
-                    delay = min(delay * 2, self.max_wait)
+                if status in (429, 500, 502, 503, 504):
+                    asked = float(retry_after) if retry_after and retry_after.isdigit() else 0.0
+                    wait(asked, f"HTTP {status}", busy=status in (429, 503))
                     continue
                 raise FetchError(f"{url}: HTTP {status}") from exc
             except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
                 self.corpus.log(url, None, note=f"attempt {attempt}; {exc}")
-                if attempt < self.max_retries:
-                    self._wait(item_name, delay, f"network error ({exc})", attempt)
-                    delay = min(delay * 2, self.max_wait)
-                    continue
-                raise FetchError(f"{url}: {exc}") from exc
+                wait(0.0, f"network error ({exc})", busy=False)
+                continue
             if check is not None:
-                verdict, wait, message = check(raw)
+                verdict, asked, message = check(raw)
                 if verdict != "ok":
                     self.corpus.log(url, status, note=f"attempt {attempt}; not stored: {message}")
-                    if verdict == "retry" and attempt < self.max_retries:
+                    if verdict == "retry":
                         if retry_after and retry_after.isdigit():
-                            wait = max(wait or 0, float(retry_after))
-                        self._wait(item_name, wait or delay, message or "retry", attempt)
-                        delay = min(delay * 2, self.max_wait)
+                            asked = max(asked or 0.0, float(retry_after))
+                        wait(asked or 0.0, message or "retry", busy=True)
                         continue
                     raise FetchError(f"{url}: {message}")
             digest = self.corpus.add(item_name, raw, url=url, method=method,
@@ -151,4 +165,3 @@ class Fetcher:
             note = f"attempt {attempt}; stored as {item_name}" + ("; gzip decoded before hashing" if encoding == "gzip" else "")
             self.corpus.log(url, status, sha512=digest, note=note)
             return raw
-        raise FetchError(f"{url}: gave up after {self.max_retries} attempts")

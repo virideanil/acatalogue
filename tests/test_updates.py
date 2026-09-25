@@ -71,6 +71,22 @@ class SupersessionTests(unittest.TestCase):
             ("wikidata-entities-20260201", "wd/P279", 0)])
 
 
+class SealTests(unittest.TestCase):
+    def test_unsealed_corpus_never_feeds_a_build(self):
+        from unittest import mock
+        from acatalogue import build
+        tmp = Path(tempfile.mkdtemp())
+        old = CorpusFile(tmp / "fam-20260101" / "corpus.sqlite", create=True, name="fam-20260101", title="t")
+        old.add("a", b"x")
+        old.seal()
+        new = CorpusFile(tmp / "fam-20260201" / "corpus.sqlite", create=True, name="fam-20260201", title="t")
+        new.add("a", b"y")                                   # still being fetched: not sealed
+        with mock.patch.object(build, "CORPORA_DIR", tmp):
+            self.assertEqual(build.latest_corpus("fam").name, "fam-20260101")
+            new.seal()
+            self.assertEqual(build.latest_corpus("fam").name, "fam-20260201")
+
+
 class DeprecationTests(unittest.TestCase):
     def test_removed_concept_is_deprecated_and_ledgered(self):
         tmp = Path(tempfile.mkdtemp())

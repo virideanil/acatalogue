@@ -108,6 +108,28 @@ class FetcherTests(unittest.TestCase):
             self.fetcher.fetch("p", self.base + "/page", check=contains_check(b"downloadTableEN"))
         self.assertFalse(self.corpus.has("p"))
 
+    def test_persistent_lag_is_waited_out_with_backoff(self):
+        _Handler.script["/lag"] = [(200, {}, MAXLAG)] * 9 + [(200, {}, OK)]
+        self.assertEqual(self.fetcher.fetch("lag", self.base + "/lag", check=mediawiki_check), OK)
+        self.assertEqual(_Handler.hits["/lag"], 10)                            # more than max_retries attempts
+        waits = [c.args[0] for c in self.sleep.call_args_list]
+        self.assertEqual(waits, sorted(waits))                                 # backing off, never hammering
+        self.assertLessEqual(max(waits), self.fetcher.max_wait)
+
+    def test_patience_runs_out(self):
+        _Handler.script["/stuck"] = [(200, {}, MAXLAG)]
+        f = Fetcher(self.corpus, min_interval=0, verbose=False, patience=60)
+        with self.assertRaises(FetchError):
+            f.fetch("stuck", self.base + "/stuck", check=mediawiki_check)
+        self.assertFalse(self.corpus.has("stuck"))
+        self.assertLessEqual(sum(c.args[0] for c in self.sleep.call_args_list), 60)
+
+    def test_errors_are_bounded_by_max_retries(self):
+        _Handler.script["/down"] = [(500, {}, b"oops")]
+        with self.assertRaises(FetchError):
+            self.fetcher.fetch("down", self.base + "/down")
+        self.assertEqual(_Handler.hits["/down"], self.fetcher.max_retries)
+
     def test_resumable(self):
         _Handler.script["/once"] = [(200, {}, OK)]
         self.fetcher.fetch("once", self.base + "/once", check=mediawiki_check)

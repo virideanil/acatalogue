@@ -267,6 +267,12 @@ def cmd_fetch(args) -> int:
         c = m49.fetch()
     elif args.source == "external":
         c = external.fetch()
+    elif args.source == "wikidata-statements":
+        decisions = wikidata.read_decisions()
+        qids = sorted({d["to"][3:] for d in decisions if d["status"] == "accepted" and d["to"].startswith("wd/")},
+                      key=lambda q: int(q[1:]))
+        c = wikidata.fetch_statements(qids)
+        c.seal()
     elif args.source == "wikidata":
         decisions = wikidata.read_decisions()
         qids = sorted({d["to"][3:] for d in decisions if d["status"] == "accepted" and d["to"].startswith("wd/")},
@@ -373,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_compendium_md)
 
     p = sub.add_parser("fetch", help="fetch a source into a new dated, sealed corpus")
-    p.add_argument("source", choices=["m49", "external", "wikidata", "wikipedia"])
+    p.add_argument("source", choices=["m49", "external", "wikidata", "wikidata-statements", "wikipedia"])
     p.set_defaults(fn=cmd_fetch)
 
     args = ap.parse_args(argv)
