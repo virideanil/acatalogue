@@ -420,8 +420,8 @@ def cmd_embed(args) -> int:
     from .embed import embed_labels
     conn = dbm.connect(args.db)
     stats = embed_labels(conn, args.model, tuple(args.kinds.split(",")))
-    print(f"{stats['model']}: {stats['embedded']} labels embedded ({stats['already_had']} already had vectors),"
-          f" {stats['seconds']} s")
+    print(f"{stats['model']}: {stats['labels']} labels, {stats['distinct_texts']} distinct texts; {stats['embedded']}"
+          f" embedded now, {stats['already_had']} already had vectors ({stats['seconds']} s)")
     return 0
 
 

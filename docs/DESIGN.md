@@ -274,7 +274,9 @@ percentiles, comparisons paired randomization tests.
 The systems compared: FTS5 words (bm25); character-trigram similarity (cognates and
 transliterations); the LSA layer, folding the query in; multilingual-e5-large-instruct, a dense
 multilingual model run locally from its own ONNX export and pinned by revision and file hashes
-(`acat embed`); and reciprocal rank fusion (k = 60). All but LSA search the same index: the
+(`acat embed`; each vector is keyed by the SHA-256 of its text, so the labels a build regenerates
+find their vectors again and no vector can drift onto another label); and reciprocal rank fusion
+(k = 60). All but LSA search the same index: the
 preferred and alternative labels of the ACAT concepts.
 
 *Results: the full run is computing; its numbers replace this paragraph in the next commit.*
